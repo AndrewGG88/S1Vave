@@ -1,0 +1,52 @@
+2800 enc 6 28
+3000 btn 11
+3100 shot
+3200 btn 11
+3300 keys 0x4880
+3400 keys 0
+3500 enc 2 7
+3600 keys 0x890
+3700 keys 0
+3800 enc 1 1
+3900 enc 2 1
+4000 btn 11
+4150 btn 11
+4300 btn 11
+4450 btn 11
+4600 enc 6 2
+4650 enc 6 -1
+4700 enc 5 -10
+4800 shot
+4900 btn 11
+5000 keys 0x1
+5060 keys 0
+5120 keys 0x1
+5180 keys 0
+5240 keys 0x80
+5300 keys 0
+5360 keys 0x1
+5420 keys 0
+5480 keys 0x8
+5540 keys 0
+5600 keys 0x1
+5660 keys 0
+5720 keys 0x80
+5780 keys 0
+5840 keys 0x400
+5900 keys 0
+6000 btn 12
+6200 btn 11
+6250 btn 11
+6300 btn 11
+6350 btn 11
+7000 shot
+7600 btn 8
+8000 shot
+8400 keys 0x80
+8700 keys 0
+9000 enc 1 -1
+9400 shot
+9600 keys 0x4880
+9900 keys 0
+11000 btn 12
+12000 end

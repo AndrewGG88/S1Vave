@@ -1,0 +1,8 @@
+# the renders (big; song.py and make_video.py make them again)
+stems/
+f/
+scripts/
+*.wav
+*.mp4
+*.png
+thumb.jpg

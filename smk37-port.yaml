@@ -1,0 +1,152 @@
+# smk37-port.yaml: every decision for OberVave's SMK-37 port, in one place (the fm1-to-smk37 kit's setup file,
+# https://github.com/genkigenki/fm1-to-smk37). Filled from the owner's answers; the code follows this file
+# (firmware/src/platform.c, obv_smk.h, smk_store.h; SMK37.md is the user's side of it).
+
+firmware:
+  name: OberVave                # unchanged on the SMK-37: the same name, logo and boot splash
+  upstream: https://github.com/zvenson/obervave
+  base: OberVave main 0b4512c (after 1.2.1, with the step sequencer), on Dinghy's platform
+  family: sloop                 # Dinghy carries Felucca's platform as SLOOP 2.6 has it: hal/, ota.c, lcd.c, loader/,
+                                # fm1pkg_make.py byte for byte SLOOP 2.6 (8fad1a1); usb.c and fm1_install.py nearly
+  board_layer: sloop            # genkigenki/sloop-fm1 smk37 (8fad1a1..b78a1d8), applied by file: the platform files
+                                # as they are, SLOOP's app-side hunks (felucca.c, storage.c, main.c) redone in
+                                # Dinghy's platform.c and OberVave's own storage (smk_store.h)
+  lost_on_smk:
+    - TRS MIDI IN / MIDI clock in over TRS (none on the SMK; OberVave had no TRS MIDI IN on the FM-1 either,
+      USB-MIDI in and clock work as before)
+    - the key LEDs (the SMK has none): the FM-1's lit keys (notes that sound, the SEQ / GLO / SAVE layers' tiles)
+      have no place; the step pads show the steps instead, the screen the layers
+    - the MASTER pot as an absolute pot: K1 is an endless encoder (a virtual pot, 24 of 1024 a detent), and
+      fader 4 in bank B sets the same level
+    - no USB serial console (OberVave has none on the FM-1 either): the kit's smk / padtest / leds commands are
+      replaced by the panel check (KNOB BANK held)
+  priorities:
+    - the OberVave workflow and manual unchanged (keys, the 14 buttons by name, the four knobs and their pages,
+      the layers)
+    - the step sequencer on the pads, without holding SEQ
+    - hands-on sound and effects on the faders
+    - expressive playing: velocity, bend, vibrato, the extra octave of keys
+
+delivery:
+  mode: own                     # the owner's own firmware: the SMK build lives on branch smk37 of zvenson/obervave
+  pr: ""
+  fork: ""                      # (none needed: the owner's repository)
+  package: obervave-<ver>-smk37.fwsc, obervave-<ver>-smk37-elite.fwsc, obervave-<ver>-smk37-mke.fwsc
+                                # (a dev build without --release: obervave-smk37[-elite|-mke].fwsc)
+  identity: SMK-37 Pro_95N, SMK-37 Elite_95N, MKE-P37_95N   # N as the FM-1's FM-1_95N: the minor version, 0 = dev
+  usb_name: Felucca             # OberVave's USB / MIDI device name (Dinghy's usb.c); every installer finds it
+  data_family: OBERVAV          # own family (tools/build.py SMK_DATA_FAMILY; "OBERVAVE" has 8 letters, 1..7 allowed)
+  copyright: zvenson            # new SMK files: "SMK-37 port of OberVave: Copyright (C) 2026 zvenson"; the layer's
+                                # files keep "M. Geisler (genkigenki/makkuro)"
+
+models:
+  - pro                         # SMK-37 Pro; also for the Starrykey 37 Play
+  - elite                       # SMK-37 Elite
+  - mke                         # MKE-P37
+
+storage:                        # the FM-1's places lie in the SMK's protected USR area: moved (smk_store.h)
+  objects:
+    - settings (globals + 32 user programs): FM-1 0xFC000 -> SMK 0x9D000
+    - sequencer patterns 1-8: FM-1 0xF4000-0xFBFFF -> SMK 0x9E000-0xA5FFF
+    - owner tag "SMK37DATA" + OBERVAV: 0xAF000
+  ota_staging: 0xBB000-0xBFFFF  # (ota.c, the layer's)
+  first_boot: clears the 10 sectors once if the tag is not OberVave's (the stock VM settings there, another port's
+              data); calibration, BT pairing, USR and key_mac are never in reach (allow-list + FL_GUARD)
+
+keys:
+  middle: fm1                   # keybed 5..31 (F3..G5) = the FM-1's 27 keys, in every layer as on the FM-1
+  outer: extend                 # C3-E3 and G#5-C6: the notes below F3 / above G5 (with OCT), through the keys' path
+                                # (EDIT held: they erase their note, as the middle keys)
+  velocity: factory             # the unit's calibration curves (trimdat, read only); the FM-1 plays 100. A recorded
+                                # or pad-set step keeps the velocity it was played with
+
+pads:
+  pattern: steps                # OberVave's sequencer (obv_seq.h): the 16 steps of the selected track's page
+  order: reading                # pads 1-8 top row (hardware 0..7) = steps 1-8 of the page, 9-16 bottom = 9-16
+  colours: screen               # track A the screen's light blue accent, track B its cream legends; the held step
+                                # red (the screen's red frame); REC: the playhead red
+  idle: dark                    # empty steps dark, beats 1 5 9 13 glow faintly (as the FM-1's keys)
+  playhead: bright              # the step playing in the track's colour at full
+  picker:
+    enabled: false
+  velocity: true
+  notes: >-
+    a pad = its step's white key in the SEQ layer, without holding SEQ: an empty step pressed is set at once with
+    the pen chord (the last notes played) at the pad's velocity; a set step pressed and let go is cleared; held, the
+    knobs edit it (NOTE LEVEL RATCHET GATE; the screen shows it after 250 ms) and a later pad makes a long note.
+    Pages 1-8 follow the sequencer's page (< >, OCT- / OCT+ in the SEQ layer, its black keys). While REC is on
+    (armed or recording) the pads play the pen chord live at their velocity, recorded as the keys are.
+
+faders:
+  pattern: banks
+  takeover: soft                # a fader acts once it moves, also after a bank change (the kit's soft takeover)
+  bank_button: FADER BANK       # LED lit on bank B
+  banks:
+    A: [CUTOFF, RESO, ENV AMT, RELEASE]          # OberVave's PERFORM page
+    B: [CHORUS mix, DELAY mix, REVERB mix, MASTER volume]   # MASTER: the level K1 turns (a virtual pot)
+  screen: bar                   # a short overlay in the hint strip: "A1 CUTOFF 2.4k" and a bar, 1.5 s
+
+wheels:
+  pitch:
+    target: bend
+    range_semitones: 2          # the program's BEND (OUTPUT page), 2 in every factory program; into the same bend
+                                # as USB-MIDI pitch bend
+    applies_to: all             # every voice
+  mod:
+    target: vibrato
+    detail: "the program's LFO to pitch, up to +-1/2 semitone, pitch only (the knob / CC 1 MOD DEPTH stays as it is)"
+  calibration: auto             # centre at power-on, the range widens as seen, a dead band, a resting centre follows drift
+
+rules:
+  no_doubles: true
+  doubles_allowed:
+    - bank A faders = the PERFORM page's knobs (the owner's choice)
+    - fader 4 in bank B = K1 MASTER (the owner's "master VOLUME")
+
+knobs:
+  layout: fm1
+  K1: master                    # the FM-1's MASTER pot as a virtual pot (24 of 1024 a detent)
+  K2: select                    # SELECT: the tempo
+  K3: algorithm                 # ALGORITHM: track A / B
+  K4: presets                   # PRESETS: the program
+  K5: knob 1                    # the page's four knobs, as on the FM-1 (the screen's row of four)
+  K6: knob 2
+  K7: knob 3
+  K8: knob 4
+  step: detent
+  pages: {}                     # (K5-K8 are KNOB 1-4: all eight knobs keep FM-1 jobs, none is left over)
+
+buttons:
+  map: printed                  # PATCH = HOME, PARA = EDIT, CHORD = ENV, NOTE REPEAT = LFO, SCALE = SEL, GLOBE = GLO,
+                                # BT = SAVE, ARP, FX, SEQ, SEQ PLAY = PLAY, SEQ REC = REC, OCTAVE-/+ = OCT-/+
+  names: firmware               # the hint lines name the SMK's buttons and knobs (PARA, PATCH, SCALE; K2, K3, K8)
+  extra:
+    KNOB BANK: held, the panel check (a bring-up screen; see open_questions)
+    FADER BANK: fader bank A / B
+    "<": step page back (the selected track's)
+    ">": step page forward
+
+screen:
+  style: keep                   # OberVave's screens; plus the fader / page overlay, the step view while a pad is
+                                # held, the panel check
+  colours: OberVave's (blue-black panel, light blue accent, red program LEDs); pads in the same blue / cream / red
+  rules:
+    - group screens by meaning; the knob block at the bottom of the screen
+    - the screen shows what you touch first (value next to the thing, a short hint line)
+    - same colours and same places on screen and panel
+    - no hidden modes; play first, few menus
+
+pedal: none
+
+power_on:
+  OCTAVE- held: the USB rescue (as OCT- on the FM-1)
+
+modes: {}
+
+open_questions:
+  - KNOB BANK: not in the owner's answers. Given the panel check (held only, its LED lit) for the beta, since
+    OberVave has no serial console for the kit's bring-up commands; keep it, or give it another job?
+  - KEY VELOCITY setting (the kit's DYNAMIC / SOFT / HARD / FIXED): not added, OberVave's GLOBAL page is full and
+    each program has VEL>AMP and VEL>FLT; add a page for it?
+  - the version and identity of the first SMK release (built here as 1.3-beta: SMK-37 Pro_953)
+  - MIDI out of the wheels and faders (now internal only, as the FM-1's knobs)

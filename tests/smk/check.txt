@@ -1,0 +1,7 @@
+# SMK-37: KNOB BANK held shows the panel check; let go, the page comes back
+2900 fader 2 77
+3000 check
+3300 shot
+3400 check
+3700 shot
+3800 end

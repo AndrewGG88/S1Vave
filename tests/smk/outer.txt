@@ -1,0 +1,10 @@
+# SMK-37: the outer keys extend the keyboard (C3 = keybed 0 .. C6 = 36), with velocity
+3000 xkey 0 90
+3200 xkey 0 0
+3300 xkey 36 40
+3500 xkey 36 0
+# OCT+ (SMK button 5): an octave up for the outer keys too
+3600 btn 5
+3800 xkey 4 100
+3900 xkey 4 0
+4100 end
