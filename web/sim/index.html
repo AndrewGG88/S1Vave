@@ -1,0 +1,129 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>S1VAVE Simulator · Roland S-1 Synth on M-VAVE FM-1</title>
+<meta name="description" content="S1VAVE, an 8-voice Roland S-1 Tweak Synth clone firmware for the M-VAVE FM-1 hardware, running in your browser: the firmware's own C code compiled to WebAssembly by Andrew GG.">
+<link rel="icon" href="logo.png">
+<link rel="stylesheet" href="sim.css">
+</head>
+<body>
+<header class="top">
+  <img class="logo" src="logo.svg?v=7" alt="S1VAVE">
+  <p class="tag">The FM-1 firmware in your browser: the same C code that runs on the device, compiled to WebAssembly.
+    Screen, sound, panel, all of it is the firmware's.</p>
+  <nav class="links">
+    <a class="cta" href="/editor/">Hardware Controller &amp; Monitor &rarr;</a>
+    <a href="https://thefirmwarehub.com/#fw-s1vave">Install on your FM-1 &rarr;</a>
+    <a href="https://github.com/andrewgg/s1vave" target="_blank" rel="noopener">Source code</a>
+  </nav>
+</header>
+
+<main>
+  <section class="device" id="device" aria-label="The simulated FM-1">
+    <div class="left">
+      <div class="knobrow">
+        <div class="knob" data-id="master" data-label="MASTER"></div>
+        <div class="knob" data-id="select" data-label="SELECT"></div>
+      </div>
+      <div class="knobrow">
+        <div class="knob" data-id="presets" data-label="PRESETS"></div>
+        <div class="knob" data-id="algo" data-label="ALGORITHM"></div>
+      </div>
+      <div class="octs">
+        <button class="btn" data-btn="0">OCT &minus;</button>
+        <button class="btn" data-btn="1">OCT +</button>
+      </div>
+    </div>
+    <div class="screenbox">
+      <canvas id="screen" width="240" height="240" aria-label="The FM-1's screen"></canvas>
+      <button id="power" class="power">
+        <span class="p1">Start audio</span>
+        <span class="p2">tap to power on</span>
+      </button>
+    </div>
+    <div class="right">
+      <div class="knobrow four">
+        <div class="knob" data-id="k1" data-label="KNOB 1"></div>
+        <div class="knob" data-id="k2" data-label="KNOB 2"></div>
+        <div class="knob" data-id="k3" data-label="KNOB 3"></div>
+        <div class="knob" data-id="k4" data-label="KNOB 4"></div>
+      </div>
+      <div class="btngrid">
+        <button class="btn" data-btn="2">FX</button>
+        <button class="btn" data-btn="3">SEL</button>
+        <button class="btn" data-btn="4">ENV</button>
+        <button class="btn" data-btn="5">LFO</button>
+        <button class="btn" data-btn="6">EDIT</button>
+        <button class="btn" data-btn="7">GLO</button>
+        <button class="btn" data-btn="8">HOME</button>
+        <button class="btn" data-btn="9">SAVE</button>
+        <button class="btn" data-btn="10">ARP</button>
+        <button class="btn" data-btn="11">SEQ</button>
+        <button class="btn" data-btn="12">PLAY<br>STOP</button>
+        <button class="btn rec" data-btn="13">REC</button>
+      </div>
+    </div>
+    <div class="keys" id="keys" aria-label="The 27 keys, F3 to G5"></div>
+  </section>
+
+  <section class="info">
+    <div class="box">
+      <h2>How to play</h2>
+      <ul>
+        <li><b>Tap</b> a function button (press and let go, touching nothing else): its pages open.
+          <b>Hold</b> it: it is a <b>layer</b>, the keys and knobs change job until you let go.
+          <b>HOME</b> tapped while a layer is held locks it open.</li>
+        <li><b>PRESETS</b> picks the program (64 calibrated Roland S-1 factory presets + user slots 65–99), <b>KNOB 1-4</b> are the page's four parameters,
+          <b>SELECT</b> the tempo, <b>ALGORITHM</b> the sequencer track (A / B), <b>OCT &minus; / +</b> the octave.</li>
+        <li><b>HOME</b> PERFORM page (Cutoff, Reso, Env, Porta), <b>EDIT</b> oscillators (Core, PWM, Sub/Noise, Draw, Chop) and filter (4-pole 24 dB/oct), <b>ENV</b> ADSR, <b>LFO</b> generator &amp; Riser, <b>FX</b> chorus,
+          delay, reverb, <b>GLO</b> global / voice (Mono, Unison 8V, Poly 8V, Chord), <b>ARP</b> the arpeggiator (HOLD, Rate, Type).</li>
+        <li><b>Hold SEQ</b>: the white keys are steps 1-16 (tap: set with the last note or chord, again: clear).
+          <b>PLAY</b> starts the sequencer, <b>REC</b> records on top.</li>
+        <li><b>Hold SAVE</b> + <b>SEL</b>: a new random sound. <b>SAVE</b> twice: keep the program
+          (kept in this browser).</li>
+      </ul>
+      <p class="hint">Hold a button with the mouse and play the computer keys at the same time; on a phone, use two fingers.</p>
+    </div>
+
+    <div class="box">
+      <h2>Computer keyboard</h2>
+      <p>The letters are printed directly on the keys above. Two continuous, natural piano rows:</p>
+      <table class="map">
+        <tr><th>Octave 4 (C4 .. E5)</th><td><kbd>Z</kbd> <kbd>S</kbd> <kbd>X</kbd> <kbd>D</kbd> <kbd>C</kbd> <kbd>V</kbd> <kbd>G</kbd> <kbd>B</kbd> <kbd>H</kbd> <kbd>N</kbd> <kbd>J</kbd> <kbd>M</kbd> <kbd>,</kbd> <kbd>L</kbd> <kbd>.</kbd> <kbd>;</kbd> <kbd>/</kbd></td></tr>
+        <tr><th>Octave 5 (C5 .. G5)</th><td><kbd>Q</kbd> <kbd>2</kbd> <kbd>W</kbd> <kbd>3</kbd> <kbd>E</kbd> <kbd>R</kbd> <kbd>5</kbd> <kbd>T</kbd></td></tr>
+        <tr><th>Bass (F3 .. B3)</th><td><kbd>Y</kbd> <kbd>7</kbd> <kbd>U</kbd> <kbd>8</kbd> <kbd>I</kbd> <kbd>9</kbd> <kbd>O</kbd></td></tr>
+        <tr><th>Buttons</th><td><kbd>1</kbd> HOME, <kbd>5</kbd> ENV, <kbd>7</kbd> LFO, <kbd>8</kbd> ARP, <kbd>0</kbd> SEQ, <kbd>-</kbd> EDIT,
+          <kbd>=</kbd> GLO, <kbd>[</kbd> FX, <kbd>]</kbd> SAVE, <kbd>Enter</kbd> SEL, <kbd>Space</kbd> PLAY, <kbd>\</kbd> REC,
+          <kbd>&larr;</kbd> <kbd>&rarr;</kbd> OCT &minus; / +</td></tr>
+        <tr><th>Knobs</th><td><kbd>&uarr;</kbd> <kbd>&darr;</kbd> PRESETS; drag a knob up / down or scroll on it</td></tr>
+      </table>
+      <p class="hint">The positions are those of a US keyboard; on other layouts the same physical keys play.</p>
+    </div>
+
+    <div class="box">
+      <h2>MIDI keyboard</h2>
+      <p>Any MIDI keyboard plays it (notes with velocity, pitch bend, mod wheel, sustain, CCs, clock), as over USB on the device.</p>
+      <div class="midirow">
+        <button id="midiBtn" class="small">Connect MIDI</button>
+        <select id="midiSel" disabled><option value="">no MIDI yet</option></select>
+      </div>
+      <p class="hint" id="midiMsg">Web MIDI works in Chrome, Edge, Opera and Firefox; not in Safari.</p>
+    </div>
+
+    <div class="box">
+      <h2>Your programs</h2>
+      <p>Saved programs, settings and sequencer patterns stay in this browser (localStorage).</p>
+      <button id="resetStore" class="small">Forget them and restart</button>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>S1Vave by Andrew GG, based on Obervave by <a href="https://github.com/zvenson">zvenson</a>, built on <a href="https://github.com/zvenson/dinghy">Dinghy</a>, <a href="https://github.com/hugelton/Felucca">Felucca</a> (Leo Kuroshita, H&uuml;gelton Instruments) and <a href="https://github.com/isod89/sloop-fm1">SLOOP</a> (isod89). The simulator follows the web simulators of <a href="https://github.com/genkigenki/Makkuro37">Makkuro37</a> and <a href="https://github.com/hericdk/winampFM">winampFM</a>. GPL-3.0. Not affiliated with M-VAVE.</p>
+</footer>
+<script src="sim.js"></script>
+</body>
+</html>

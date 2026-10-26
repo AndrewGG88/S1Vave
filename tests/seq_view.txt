@@ -1,0 +1,36 @@
+3000 btn 11
+3100 btn 11
+3300 shot
+3400 keys 0x80
+3600 keys 0
+3800 keys 0x800
+4000 keys 0
+4200 keys 0x4880
+4400 keys 0
+4600 enc 2 1
+4800 keys 0x200
+5000 enc 2 1
+5200 enc 2 1
+5400 keys 0
+5800 shot
+6000 btn 12
+7000 shot
+7500 btn 12
+7600 btn 11
+7900 shot
+8000 btn 11
+8100 enc 2 1
+8300 shot
+8400 btn 9
+8700 shot
+8800 enc 2 1
+8900 enc 5 1
+9000 enc 5 1
+9600 shot
+9800 enc 2 -1
+9900 enc 4 1
+10000 enc 4 1
+10600 shot
+11000 btn 8
+11500 shot
+16000 end

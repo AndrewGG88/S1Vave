@@ -1,0 +1,36 @@
+# the FM-1 script tests/seq_view.txt with the SMK-37's button and encoder numbers
+3000 btn 15
+3300 shot
+3400 keys 0x80
+3600 keys 0
+3800 keys 0x800
+4000 keys 0
+4200 keys 0x4880
+4400 keys 0
+4600 enc 4 1
+4800 keys 0x200
+5000 enc 4 1
+5200 enc 4 1
+5400 keys 0
+5800 shot
+6000 btn 16
+7000 shot
+7500 btn 16
+7600 btn 15
+7900 shot
+8000 btn 15
+8100 enc 4 1
+8300 shot
+8400 btn 11
+8700 shot
+8800 enc 4 1
+8900 enc 7 1
+9000 enc 7 1
+9600 shot
+9800 enc 4 -1
+9900 enc 6 1
+10000 enc 6 1
+10600 shot
+11000 btn 12
+11500 shot
+16000 end

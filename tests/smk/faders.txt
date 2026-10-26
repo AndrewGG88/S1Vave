@@ -1,0 +1,22 @@
+# SMK-37: the faders, bank A (PERFORM) and B (effects, MASTER), a fader acts once it moves
+100 fader 0 10
+100 fader 1 10
+100 fader 2 10
+100 fader 3 10
+3000 fader 0 100
+3100 fader 1 50
+3200 fader 2 0
+3300 fader 3 127
+3400 dump
+3500 shot
+# FADER BANK: B; a fader that does not move does nothing, a moved one sets its effect
+3600 btn 1
+3700 dump
+3800 fader 0 120
+3900 fader 3 127
+4000 fader 3 64
+4100 dump
+4200 btn 1
+4300 fader 0 30
+4400 dump
+4600 end

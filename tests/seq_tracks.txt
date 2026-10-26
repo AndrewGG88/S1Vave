@@ -1,0 +1,17 @@
+# track A blue, track B orange: the same screen for both
+3000 btn 11
+3100 btn 11
+3200 keys 0x80
+3400 keys 0
+3600 keys 0x800
+3800 keys 0
+4200 shot
+4400 enc 1 1
+4600 shot
+4800 enc 2 1
+5000 keys 0x4000
+5200 keys 0
+5400 keys 0x200
+5600 keys 0
+6000 shot
+6500 end

@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 190" width="100%" height="100%">
+  <defs>
+    <style>
+      .primary-text { fill: #F2F6FA; }
+      .accent-green { fill: #00C885; }
+    </style>
+  </defs>
+  <g>
+    <!-- S -->
+    <path class="primary-text" d="M 191 16 Q 199 16 199 24 L 199 40 Q 199 48 191 48 L 76 48 A 16 16 0 0 0 60 64 A 16 16 0 0 0 76 80 L 154 80 A 45 45 0 0 1 199 125 L 199 129 A 45 45 0 0 1 154 174 L 33 174 Q 25 174 25 166 L 25 150 Q 25 142 33 142 L 148 142 A 16 16 0 0 0 164 126 A 16 16 0 0 0 148 110 L 70 110 A 45 45 0 0 1 25 65 L 25 61 A 45 45 0 0 1 70 16 Z" />
+
+    <!-- 1 -->
+    <path class="primary-text" d="M 263 16 L 289 16 Q 297 16 297 24 L 297 166 Q 297 174 289 174 L 266 174 Q 258 174 258 166 L 258 56 L 234 63 Q 226 65 226 57 L 226 42 Q 226 35 232 32 L 256 18 Q 260 16 263 16 Z" />
+
+    <!-- First V (Green, rounded outer apex and inner vertex matching S and E) -->
+    <path class="accent-green" d="M 326 16 L 348 16 Q 356 16 359 23 L 407 119 A 7 7 0 0 0 419 119 L 467 23 Q 470 16 478 16 L 500 16 Q 508 16 504 24 L 440 152 A 30 30 0 0 1 386 152 L 322 24 Q 318 16 326 16 Z" />
+
+    <!-- A (Outer rounded chevron) -->
+    <path class="primary-text" d="M 535 38 A 30 30 0 0 1 589 38 L 653 166 Q 657 174 649 174 L 627 174 Q 619 174 616 167 L 568 71 A 7 7 0 0 0 556 71 L 508 167 Q 505 174 497 174 L 475 174 Q 467 174 471 166 Z" />
+
+    <!-- A (Inner Green Bar, rounded) -->
+    <rect class="accent-green" x="546" y="114" width="32" height="60" rx="8" />
+
+    <!-- Second V (Rounded outer apex and inner vertex matching S and E) -->
+    <path class="primary-text" d="M 624 16 L 646 16 Q 654 16 657 23 L 705 119 A 7 7 0 0 0 717 119 L 765 23 Q 768 16 776 16 L 798 16 Q 806 16 802 24 L 738 152 A 30 30 0 0 1 684 152 L 620 24 Q 616 16 624 16 Z" />
+
+    <!-- E (Rounded outer and inner corners matching S) -->
+    <path class="primary-text" d="M 850 16 L 966 16 Q 974 16 974 24 L 974 40 Q 974 48 966 48 L 863 48 A 8 8 0 0 0 855 56 L 855 72 A 8 8 0 0 0 863 80 L 956 80 Q 964 80 964 88 L 964 102 Q 964 110 956 110 L 863 110 A 8 8 0 0 0 855 118 L 855 134 A 8 8 0 0 0 863 142 L 966 142 Q 974 142 974 150 L 974 166 Q 974 174 966 174 L 850 174 A 34 34 0 0 1 816 140 L 816 50 A 34 34 0 0 1 850 16 Z" />
+  </g>
+</svg>

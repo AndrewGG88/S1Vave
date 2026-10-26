@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S1VAVE & Roland S-1 // Controller & Monitor</title>
+  <meta name="description" content="Unified Hardware Controller and Real-time Audio/MIDI Monitor for Roland AIRA Compact S-1 and M-VAVE FM-1 (S1Vave 8-Voice Firmware).">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=20261024_1">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header: Branding & MIDI Device Status -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="logo-badge">
+          <span class="logo-s1">S1</span><span class="logo-v">V</span><span class="logo-a"><span class="logo-notch"></span>A</span><span class="logo-ve">VE</span>
+        </div>
+        <div class="brand-text">
+          <h1>CONTROLLER &amp; MONITOR</h1>
+          <p class="subtitle">Unified Control Surface &amp; Real-Time Diagnostics · Roland S-1 &amp; M-VAVE FM-1</p>
+        </div>
+        <a href="/" class="nav-sim-link" title="Open FM-1 WebAssembly Hardware Simulator">&larr; FM-1 Sim</a>
+      </div>
+
+      <!-- MIDI Connection Status -->
+      <div class="midi-status-panel">
+        <div class="device-tag active" id="tagFM1">
+          <span class="status-indicator online" id="indFM1"></span>
+          <span class="dev-name">SYNTH MIDI OUT:</span>
+          <select id="selFM1Out" class="port-select" title="MIDI Output for M-VAVE FM-1 / S1Vave"></select>
+        </div>
+        <div class="device-tag" id="tagMidiIn">
+          <span class="status-indicator" id="indMidiIn"></span>
+          <span class="dev-name">CONTROLLER IN:</span>
+          <select id="selMidiIn" class="port-select" title="Incoming MIDI Keyboard / Controller"></select>
+        </div>
+        <!-- Hidden fallback output for compatibility -->
+        <select id="selS1Out" style="display:none"></select>
+      </div>
+    </header>
+
+    <!-- Quick Performance & Preset Management Toolbar -->
+    <section class="action-toolbar">
+      <div class="toolbar-left">
+        <!-- Preset / Program Change Navigation -->
+        <div class="preset-nav-cluster">
+          <span class="toolbar-label">PRESET:</span>
+          <button class="tool-action-btn preset-step-btn" id="btnPrevPreset" title="Previous Preset (Program Change -1)">
+            <span class="icon">◀</span>
+          </button>
+          <select id="selPreset" class="preset-select" title="Direct Program Change / Preset Selection"></select>
+          <button class="tool-action-btn preset-step-btn" id="btnNextPreset" title="Next Preset (Program Change +1)">
+            <span class="icon">▶</span>
+          </button>
+        </div>
+
+        <div class="toolbar-divider"></div>
+
+        <span class="toolbar-label">PATCH:</span>
+        <button class="tool-action-btn read-synth-btn" id="btnReadSynth" title="Fetch / Read all current parameter values from hardware synth (CC 119)">
+          <span class="icon">📥</span> READ SYNTH
+        </button>
+        <button class="tool-action-btn" id="btnInitPatch" title="Reset all parameters to clean baseline patch">
+          <span class="icon">↺</span> INIT PATCH
+        </button>
+        <button class="tool-action-btn" id="btnRandomize" title="Generate creative musical random patch">
+          <span class="icon">🎲</span> RANDOMIZE
+        </button>
+        <button class="tool-action-btn" id="btnExportJson" title="Export current patch state to JSON file">
+          <span class="icon">💾</span> EXPORT JSON
+        </button>
+        <button class="tool-action-btn" id="btnImportJson" title="Import patch state from JSON file">
+          <span class="icon">📂</span> IMPORT JSON
+        </button>
+        <input type="file" id="fileImportJson" accept=".json" style="display:none">
+      </div>
+
+      <div class="toolbar-right">
+        <button class="tool-action-btn monitor-toggle active" id="btnToggleMonitor" title="Toggle Real-Time Audio &amp; MIDI Monitoring Deck">
+          <span class="icon">📊</span> MONITOR DECK
+        </button>
+        <button class="preset-btn panic" id="btnPanic" title="All Notes Off &amp; Reset Modulation (Panic)">
+          PANIC ⏹
+        </button>
+      </div>
+    </section>
+
+    <!-- Real-Time Monitoring Deck: USB Audio Live Monitor & MIDI Traffic -->
+    <section class="monitoring-deck" id="monitoringDeck">
+      <!-- 1. Live USB Audio Pass-Through Router & Scope -->
+      <div class="monitor-card audio-routing-card">
+        <div class="card-title">
+          <span class="icon">🔊</span> USB AUDIO LIVE MONITOR &amp; SOUND CARD SINK
+        </div>
+
+        <!-- Master Pass-Through Route Toggle -->
+        <button class="audio-passthrough-btn" id="btnAudioPassthrough" title="Route audio from FM-1 synth input directly to your sound card (speakers / headphones)">
+          <span class="dot"></span><span id="txtAudioPassthrough">HEAR SYNTH: OFF (CLICK TO LISTEN)</span>
+        </button>
+
+        <!-- Device Selection Dropdowns -->
+        <div class="audio-device-grid">
+          <div class="device-select-box">
+            <label for="selAudioInput">🎤 SYNTH INPUT (USB / MIC / LINE-IN):</label>
+            <select id="selAudioInput" class="sink-select" title="Select audio input device where FM-1 synth is connected"></select>
+          </div>
+          <div class="device-select-box">
+            <label for="selAudioSink">🎧 SOUND CARD OUTPUT (LISTEN HERE):</label>
+            <select id="selAudioSink" class="sink-select" title="Select sound card, headphones or speakers where you want to listen"></select>
+          </div>
+        </div>
+
+        <div class="audio-bottom-row">
+          <div class="audio-vol-box" title="Master Sound Card Pass-Through Volume">
+            <label>MONITOR VOL: <span id="dispMonitorVol">100%</span></label>
+            <input type="range" min="0" max="150" value="100" id="slMonitorVol" class="audio-slider">
+          </div>
+
+          <!-- Stereo VU Level Meters -->
+          <div class="vu-meters-block single-synth">
+            <div class="meter-channel">
+              <span class="ch-label">OUT L</span>
+              <div class="vu-track"><div class="vu-bar" id="vuFM1L"></div><div class="vu-peak" id="peakFM1L"></div></div>
+            </div>
+            <div class="meter-channel">
+              <span class="ch-label">OUT R</span>
+              <div class="vu-track"><div class="vu-bar" id="vuFM1R"></div><div class="vu-peak" id="peakFM1R"></div></div>
+            </div>
+          </div>
+
+          <!-- Compact CRT Oscilloscope -->
+          <div class="scope-wrapper compact">
+            <canvas id="liveScopeCanvas" width="220" height="48"></canvas>
+            <div class="scope-overlay">
+              <span class="scope-status" id="scopeStatus">SYNTH PREVIEW</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Real-Time MIDI Traffic Monitor -->
+      <div class="monitor-card midi-log-card">
+        <div class="card-title">
+          <span class="icon">⚡</span> LIVE MIDI TRAFFIC MONITOR
+          <div class="midi-log-controls">
+            <button class="filter-btn active" data-filter="all">ALL</button>
+            <button class="filter-btn" data-filter="note">NOTES</button>
+            <button class="filter-btn" data-filter="cc">CC</button>
+            <button class="mini-btn clear-btn" id="btnClearMidiLog" title="Clear Event Log">CLEAR</button>
+          </div>
+        </div>
+        <div class="midi-log-stream" id="midiLogStream">
+          <div class="log-entry system">[SYS] MIDI Monitor online. Connected to hardware.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Workspace: Parameter Panels Grid (All Real Mapped Controls) -->
+    <main class="synth-workspace">
+      <!-- 1. VCO OSCILLATORS -->
+      <section class="panel-card osc-panel">
+        <div class="card-header">
+          <h2>1. OSCILLATOR (VCO)</h2>
+          <span class="badge">CORE</span>
+        </div>
+        <div class="controls-grid">
+          <div class="ctrl-group">
+            <label>RANGE <span class="cc">CC 14</span></label>
+            <div class="range-selector" id="grpRange">
+              <button class="opt-btn" data-val="0">64'</button>
+              <button class="opt-btn" data-val="1">32'</button>
+              <button class="opt-btn" data-val="2">16'</button>
+              <button class="opt-btn active" data-val="3">8'</button>
+              <button class="opt-btn" data-val="4">4'</button>
+              <button class="opt-btn" data-val="5">2'</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>SAW LEVEL</label>
+              <span class="val-display" id="valSaw">127</span>
+            </div>
+            <input type="range" min="0" max="127" value="127" id="slSaw" data-cc="20">
+            <span class="cc-tag">CC 20</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>PULSE LEVEL</label>
+              <span class="val-display" id="valPulse">0</span>
+            </div>
+            <input type="range" min="0" max="127" value="0" id="slPulse" data-cc="19">
+            <span class="cc-tag">CC 19</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>PULSE WIDTH / PWM</label>
+              <span class="val-display" id="valPw">0</span>
+            </div>
+            <input type="range" min="0" max="127" value="0" id="slPw" data-cc="15">
+            <span class="cc-tag">CC 15</span>
+          </div>
+
+          <div class="ctrl-group">
+            <label>PWM SOURCE <span class="cc">CC 16</span></label>
+            <div class="btn-trio" id="grpPwmSrc">
+              <button class="opt-btn" data-val="0">ENV</button>
+              <button class="opt-btn active" data-val="1">MAN</button>
+              <button class="opt-btn" data-val="2">LFO</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>SUB LEVEL</label>
+              <span class="val-display" id="valSub">0</span>
+            </div>
+            <input type="range" min="0" max="127" value="0" id="slSub" data-cc="21">
+            <span class="cc-tag">CC 21</span>
+          </div>
+
+          <div class="ctrl-group">
+            <label>SUB TYPE <span class="cc">CC 22</span></label>
+            <div class="btn-trio" id="grpSubType">
+              <button class="opt-btn" data-val="0">-2o.A</button>
+              <button class="opt-btn" data-val="1">-2oc</button>
+              <button class="opt-btn active" data-val="2">-1oc</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>NOISE LEVEL</label>
+              <span class="val-display" id="valNoise">0</span>
+            </div>
+            <input type="range" min="0" max="127" value="0" id="slNoise" data-cc="23">
+            <span class="cc-tag">CC 23</span>
+          </div>
+
+          <div class="ctrl-group">
+            <label>NOISE MODE <span class="cc">CC 78</span></label>
+            <div class="btn-pair" id="grpNoiseMode">
+              <button class="opt-btn active" data-val="0">PINK</button>
+              <button class="opt-btn" data-val="1">WHITE</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>FINE TUNE</label>
+              <span class="val-display" id="valTune">64</span>
+            </div>
+            <input type="range" min="0" max="127" value="64" id="slTune" data-cc="76">
+            <span class="cc-tag">CC 76 (±1 OCT)</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>OSC BEND SENS</label>
+              <span class="val-display" id="valOscBend">2</span>
+            </div>
+            <input type="range" min="0" max="24" value="2" id="slOscBend" data-cc="18">
+            <span class="cc-tag">CC 18 (0–24 ST)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 1B. OSC SHAPING (DRAW & CHOP) -->
+      <section class="panel-card osc-shaping-panel">
+        <div class="card-header">
+          <h2>1B. OSC SHAPING (DRAW &amp; CHOP)</h2>
+          <span class="badge">S-1 EXCLUSIVE</span>
+        </div>
+        <div class="controls-grid">
+          <div class="ctrl-group">
+            <label>OSC DRAW SWITCH <span class="cc">CC 107</span></label>
+            <div class="btn-trio" id="grpDrawSw">
+              <button class="opt-btn active" data-val="0">OFF</button>
+              <button class="opt-btn" data-val="1">STEP</button>
+              <button class="opt-btn" data-val="2">SLOPE</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>DRAW MULTIPLY</label>
+              <span class="val-display" id="valDrawMult">1.0x</span>
+            </div>
+            <input type="range" min="0" max="31" value="0" id="slDrawMult" data-cc="102">
+            <span class="cc-tag">CC 102 (1.0x–32.0x)</span>
+          </div>
+
+          <div class="slider-box prominent">
+            <div class="slider-header">
+              <label>CHOP OVERTONE</label>
+              <span class="val-display" id="valChopOvtn">OFF (0)</span>
+            </div>
+            <input type="range" min="0" max="200" value="0" id="slChopOvtn" data-cc="103">
+            <span class="cc-tag">CC 103 (&gt;100: REV PHASE)</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>CHOP COMB</label>
+              <span class="val-display" id="valChopComb">1.0x</span>
+            </div>
+            <input type="range" min="0" max="31" value="0" id="slChopComb" data-cc="104">
+            <span class="cc-tag">CC 104 (1.0x–32.0x)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. VCF FILTER -->
+      <section class="panel-card filter-panel">
+        <div class="card-header highlight-orange">
+          <h2>2. FILTER (VCF 4-POLE)</h2>
+          <span class="badge orange">24 dB/OCT</span>
+        </div>
+        <div class="controls-grid">
+          <div class="slider-box prominent">
+            <div class="slider-header">
+              <label>CUTOFF FREQUENCY</label>
+              <span class="val-display big" id="valCutoff">127</span>
+            </div>
+            <input type="range" min="0" max="127" value="127" id="slCutoff" data-cc="74" class="accent-orange">
+            <span class="cc-tag">CC 74 (20Hz–20kHz)</span>
+          </div>
+
+          <div class="slider-box prominent">
+            <div class="slider-header">
+              <label>RESONANCE</label>
+              <span class="val-display big" id="valReso">0</span>
+            </div>
+            <input type="range" min="0" max="127" value="0" id="slReso" data-cc="71" class="accent-orange">
+            <span class="cc-tag">CC 71 (SELF-OSC)</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>ENV MOD DEPTH</label>
+              <span class="val-display" id="valFenv">0</span>
+            </div>
+            <input type="range" min="0" max="127" value="0" id="slFenv" data-cc="24">
+            <span class="cc-tag">CC 24</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>LFO MOD DEPTH</label>
+              <span class="val-display" id="valFlfo">0</span>
+            </div>
+            <input type="range" min="0" max="127" value="0" id="slFlfo" data-cc="25">
+            <span class="cc-tag">CC 25</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>KEY FOLLOW</label>
+              <span class="val-display" id="valKeytrk">64</span>
+            </div>
+            <input type="range" min="0" max="127" value="64" id="slKeytrk" data-cc="26">
+            <span class="cc-tag">CC 26</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>BEND SENSITIVITY</label>
+              <span class="val-display" id="valFltBend">2</span>
+            </div>
+            <input type="range" min="0" max="24" value="2" id="slFltBend" data-cc="27">
+            <span class="cc-tag">CC 27</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. ENVELOPES (ADSR) -->
+      <section class="panel-card env-panel">
+        <div class="card-header">
+          <h2>3. ENVELOPE (ADSR)</h2>
+          <span class="badge">CONTOUR</span>
+        </div>
+        <div class="env-curve-box">
+          <canvas id="envCanvas" width="280" height="60" class="env-canvas"></canvas>
+        </div>
+        <div class="controls-grid">
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>ATTACK</label>
+              <span class="val-display" id="valAtt">0</span>
+            </div>
+            <input type="range" min="0" max="127" value="0" id="slAtt" data-cc="73">
+            <span class="cc-tag">CC 73</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>DECAY</label>
+              <span class="val-display" id="valDec">64</span>
+            </div>
+            <input type="range" min="0" max="127" value="64" id="slDec" data-cc="75">
+            <span class="cc-tag">CC 75</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>SUSTAIN</label>
+              <span class="val-display" id="valSus">127</span>
+            </div>
+            <input type="range" min="0" max="127" value="127" id="slSus" data-cc="30">
+            <span class="cc-tag">CC 30</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>RELEASE</label>
+              <span class="val-display" id="valRel">30</span>
+            </div>
+            <input type="range" min="0" max="127" value="30" id="slRel" data-cc="72">
+            <span class="cc-tag">CC 72</span>
+          </div>
+
+          <div class="ctrl-group">
+            <label>AMP MODE <span class="cc">CC 28</span></label>
+            <div class="btn-pair" id="grpAmpMode">
+              <button class="opt-btn" data-val="0">GATE</button>
+              <button class="opt-btn active" data-val="1">ENV</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group">
+            <label>ENV TRIGGER <span class="cc">CC 29</span></label>
+            <div class="btn-trio" id="grpEnvTrg">
+              <button class="opt-btn" data-val="0">LFO</button>
+              <button class="opt-btn" data-val="1">GATE</button>
+              <button class="opt-btn active" data-val="2">GATE+TRIG</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. LFO & RISER -->
+      <section class="panel-card lfo-panel">
+        <div class="card-header">
+          <h2>4. LFO &amp; RISER</h2>
+          <span class="badge">MOD</span>
+        </div>
+        <div class="controls-grid">
+          <div class="ctrl-group">
+            <label>WAVEFORM <span class="cc">CC 12</span></label>
+            <div class="range-selector" id="grpLfoWave">
+              <button class="opt-btn" data-val="0">SAW</button>
+              <button class="opt-btn" data-val="1">ISW</button>
+              <button class="opt-btn active" data-val="2">TRI</button>
+              <button class="opt-btn" data-val="3">SQR</button>
+              <button class="opt-btn" data-val="4">RND</button>
+              <button class="opt-btn" data-val="5">NOI</button>
+            </div>
+          </div>
+
+          <div class="slider-box prominent">
+            <div class="slider-header">
+              <label>LFO RATE</label>
+              <span class="val-display" id="valLfoRate">60</span>
+            </div>
+            <input type="range" min="0" max="127" value="60" id="slLfoRate" data-cc="3">
+            <span class="cc-tag">CC 3</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>PITCH LFO DEPTH</label>
+              <span class="val-display" id="valLfoPitch">0</span>
+            </div>
+            <input type="range" min="0" max="127" value="0" id="slLfoPitch" data-cc="13">
+            <span class="cc-tag">CC 13</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>MOD WHEEL DEPTH</label>
+              <span class="val-display" id="valModDepth">15</span>
+            </div>
+            <input type="range" min="0" max="127" value="15" id="slModDepth" data-cc="1">
+            <span class="cc-tag">CC 1</span>
+          </div>
+
+          <div class="ctrl-group">
+            <label>LFO MODE <span class="cc">CC 79</span></label>
+            <div class="btn-pair" id="grpLfoMode">
+              <button class="opt-btn active" data-val="0">NORM</button>
+              <button class="opt-btn" data-val="1">FAST</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group">
+            <label>TEMPO SYNC <span class="cc">CC 106</span></label>
+            <div class="btn-pair" id="grpLfoSync">
+              <button class="opt-btn active" data-val="0">OFF</button>
+              <button class="opt-btn" data-val="1">ON</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group">
+            <label>KEY TRIGGER <span class="cc">CC 105</span></label>
+            <div class="btn-pair" id="grpLfoTrig">
+              <button class="opt-btn active" data-val="0">OFF</button>
+              <button class="opt-btn" data-val="1">ON</button>
+            </div>
+          </div>
+
+          <!-- Riser Section in Panel 4 -->
+          <div class="ctrl-group full-width">
+            <label>RISER MODE <span class="cc">CC 32 / CC 78</span></label>
+            <div class="range-selector" id="grpRiserMode">
+              <button class="opt-btn active" data-val="0">OFF</button>
+              <button class="opt-btn" data-val="1">SYNC</button>
+              <button class="opt-btn" data-val="2">QUIV</button>
+              <button class="opt-btn" data-val="3">QV.PAN</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>RISER RESO</label>
+              <span class="val-display" id="valRiserReso">30</span>
+            </div>
+            <input type="range" min="0" max="100" value="30" id="slRiserReso" data-cc="33">
+            <span class="cc-tag">CC 33</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>RISER SHAPE</label>
+              <span class="val-display" id="valRiserShape">0</span>
+            </div>
+            <input type="range" min="0" max="100" value="0" id="slRiserShape" data-cc="34">
+            <span class="cc-tag">CC 34 (SAW&rarr;SQR)</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>RISER LEVEL</label>
+              <span class="val-display" id="valRiserLvl">80</span>
+            </div>
+            <input type="range" min="0" max="100" value="80" id="slRiserLvl" data-cc="35">
+            <span class="cc-tag">CC 35</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. EFFECTS (CHORUS, DELAY, REVERB) -->
+      <section class="panel-card fx-panel">
+        <div class="card-header">
+          <h2>5. EFFECTS (ROLAND SUITE)</h2>
+          <span class="badge">SPATIAL</span>
+        </div>
+        <div class="controls-grid">
+          <div class="ctrl-group">
+            <label>CHORUS TYPE <span class="cc">CC 93</span></label>
+            <div class="range-selector" id="grpChoMode">
+              <button class="opt-btn active" data-val="0">OFF</button>
+              <button class="opt-btn" data-val="1">TYPE 1</button>
+              <button class="opt-btn" data-val="2">TYPE 2</button>
+              <button class="opt-btn" data-val="3">TYPE 3</button>
+              <button class="opt-btn" data-val="4">TYPE 4</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>DELAY LEVEL</label>
+              <span class="val-display" id="valDlyLvl">0</span>
+            </div>
+            <input type="range" min="0" max="127" value="0" id="slDlyLvl" data-cc="92">
+            <span class="cc-tag">CC 92</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>DELAY TIME</label>
+              <span class="val-display" id="valDlyTime">50</span>
+            </div>
+            <input type="range" min="0" max="127" value="50" id="slDlyTime" data-cc="90">
+            <span class="cc-tag">CC 90</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>DELAY FEEDBACK</label>
+              <span class="val-display" id="valDlyFb">50</span>
+            </div>
+            <input type="range" min="0" max="127" value="50" id="slDlyFb" data-cc="36">
+            <span class="cc-tag">CC 36</span>
+          </div>
+
+          <div class="ctrl-group">
+            <label>DELAY TEMPO SYNC <span class="cc">CC 37</span></label>
+            <div class="btn-pair" id="grpDlySync">
+              <button class="opt-btn" data-val="0">OFF</button>
+              <button class="opt-btn active" data-val="1">ON</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group full-width">
+            <label>REVERB TYPE <span class="cc">CC 38</span></label>
+            <div class="range-selector" id="grpRevType">
+              <button class="opt-btn" data-val="0">AMB</button>
+              <button class="opt-btn" data-val="1">ROOM</button>
+              <button class="opt-btn" data-val="2">HALL 1</button>
+              <button class="opt-btn" data-val="3">HALL 2</button>
+              <button class="opt-btn" data-val="4">PLATE</button>
+              <button class="opt-btn active" data-val="5">SPRING</button>
+              <button class="opt-btn" data-val="6">MOD</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>REVERB LEVEL</label>
+              <span class="val-display" id="valRevLvl">0</span>
+            </div>
+            <input type="range" min="0" max="127" value="0" id="slRevLvl" data-cc="91">
+            <span class="cc-tag">CC 91</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>REVERB TIME</label>
+              <span class="val-display" id="valRevTime">100</span>
+            </div>
+            <input type="range" min="0" max="127" value="100" id="slRevTime" data-cc="89">
+            <span class="cc-tag">CC 89</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>REVERB PRE-DELAY</label>
+              <span class="val-display" id="valRevPre">20 ms</span>
+            </div>
+            <input type="range" min="0" max="100" value="20" id="slRevPre" data-cc="39">
+            <span class="cc-tag">CC 39 (0–100ms)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 6. VOICE & SYSTEM -->
+      <section class="panel-card voice-panel">
+        <div class="card-header">
+          <h2>6. VOICE &amp; SYSTEM (8-VOICE)</h2>
+          <span class="badge">ROUTING</span>
+        </div>
+        <div class="controls-grid">
+          <div class="ctrl-group">
+            <label>POLY MODE <span class="cc">CC 80</span></label>
+            <div class="range-selector" id="grpPolyMode">
+              <button class="opt-btn active" data-val="0">MONO</button>
+              <button class="opt-btn" data-val="1">UNISON (8V)</button>
+              <button class="opt-btn" data-val="2">POLY (8V)</button>
+              <button class="opt-btn" data-val="3">CHORD</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group">
+            <label>PORTAMENTO MODE <span class="cc">CC 31</span></label>
+            <div class="btn-trio" id="grpPortaMode">
+              <button class="opt-btn active" data-val="0">OFF</button>
+              <button class="opt-btn" data-val="1">ON</button>
+              <button class="opt-btn" data-val="2">AUTO</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group">
+            <label>PORTA SWITCH <span class="cc">CC 65</span></label>
+            <div class="btn-pair" id="grpPortaSw">
+              <button class="opt-btn active" data-val="0">OFF</button>
+              <button class="opt-btn" data-val="1">ON</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group">
+            <label>SUSTAIN PEDAL <span class="cc">CC 64</span></label>
+            <div class="btn-pair" id="grpSustainPedal">
+              <button class="opt-btn active" data-val="0">OFF</button>
+              <button class="opt-btn" data-val="1">HOLD</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>PORTAMENTO TIME</label>
+              <span class="val-display" id="valPortaTime">30</span>
+            </div>
+            <input type="range" min="0" max="127" value="30" id="slPortaTime" data-cc="5">
+            <span class="cc-tag">CC 5</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>KEY TRANSPOSE</label>
+              <span class="val-display" id="valTranspose">0 ST</span>
+            </div>
+            <input type="range" min="0" max="120" value="60" id="slTranspose" data-cc="77">
+            <span class="cc-tag">CC 77 (-60..+60)</span>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>PATCH VOLUME</label>
+              <span class="val-display" id="valVol">90</span>
+            </div>
+            <input type="range" min="0" max="127" value="90" id="slVol" data-cc="7">
+            <span class="cc-tag">CC 7</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7. CHORD MEMORY CONFIG (4-VOICE) -->
+      <section class="panel-card chord-panel">
+        <div class="card-header">
+          <h2>7. CHORD MEMORY (4-VOICE)</h2>
+          <span class="badge">POLY / CHORD</span>
+        </div>
+        <div class="controls-grid">
+          <div class="ctrl-group">
+            <label>VOICE 2 SW <span class="cc">CC 81</span></label>
+            <div class="btn-pair" id="grpChordSw2">
+              <button class="opt-btn" data-val="0">OFF</button>
+              <button class="opt-btn active" data-val="1">ON</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>VOICE 2 KEY SHIFT</label>
+              <span class="val-display" id="valChordKs2">0 ST</span>
+            </div>
+            <input type="range" min="0" max="24" value="12" id="slChordKs2" data-cc="85">
+            <span class="cc-tag">CC 85 (-12..+12 ST)</span>
+          </div>
+
+          <div class="ctrl-group">
+            <label>VOICE 3 SW <span class="cc">CC 82</span></label>
+            <div class="btn-pair" id="grpChordSw3">
+              <button class="opt-btn" data-val="0">OFF</button>
+              <button class="opt-btn active" data-val="1">ON</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>VOICE 3 KEY SHIFT</label>
+              <span class="val-display" id="valChordKs3">0 ST</span>
+            </div>
+            <input type="range" min="0" max="24" value="12" id="slChordKs3" data-cc="86">
+            <span class="cc-tag">CC 86 (-12..+12 ST)</span>
+          </div>
+
+          <div class="ctrl-group">
+            <label>VOICE 4 SW <span class="cc">CC 83</span></label>
+            <div class="btn-pair" id="grpChordSw4">
+              <button class="opt-btn" data-val="0">OFF</button>
+              <button class="opt-btn active" data-val="1">ON</button>
+            </div>
+          </div>
+
+          <div class="slider-box">
+            <div class="slider-header">
+              <label>VOICE 4 KEY SHIFT</label>
+              <span class="val-display" id="valChordKs4">0 ST</span>
+            </div>
+            <input type="range" min="0" max="24" value="12" id="slChordKs4" data-cc="87">
+            <span class="cc-tag">CC 87 (-12..+12 ST)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. ARPEGGIATOR & MASTER CLOCK -->
+      <section class="panel-card arp-panel">
+        <div class="card-header">
+          <h2>8. ARPEGGIATOR &amp; CLOCK</h2>
+          <span class="badge">TEMPO / ARP</span>
+        </div>
+        <div class="controls-grid">
+          <div class="ctrl-group">
+            <label>ARPEGGIATOR</label>
+            <div class="btn-pair" id="grpArpSw">
+              <button class="opt-btn active" data-val="0">OFF</button>
+              <button class="opt-btn" data-val="1">ON</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group">
+            <label>ARP HOLD</label>
+            <div class="btn-pair" id="grpArpHold">
+              <button class="opt-btn active" data-val="0">OFF</button>
+              <button class="opt-btn" data-val="1">ON</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group full-width">
+            <label>ARP TYPE</label>
+            <div class="range-selector" id="grpArpType">
+              <button class="opt-btn active" data-val="0">UP</button>
+              <button class="opt-btn" data-val="1">DOWN</button>
+              <button class="opt-btn" data-val="2">UP.DW</button>
+              <button class="opt-btn" data-val="3">UP.2</button>
+              <button class="opt-btn" data-val="4">DW.2</button>
+              <button class="opt-btn" data-val="5">U.D.2</button>
+              <button class="opt-btn" data-val="6">RAND</button>
+              <button class="opt-btn" data-val="7">RND.2</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group full-width">
+            <label>ARP RATE / DIVISION</label>
+            <div class="range-selector" id="grpArpRate">
+              <button class="opt-btn" data-val="0">1/4</button>
+              <button class="opt-btn" data-val="1">1/8</button>
+              <button class="opt-btn active" data-val="2">1/16</button>
+              <button class="opt-btn" data-val="3">1/32</button>
+              <button class="opt-btn" data-val="4">8T</button>
+              <button class="opt-btn" data-val="5">16T</button>
+              <button class="opt-btn" data-val="6">32T</button>
+            </div>
+          </div>
+
+          <div class="slider-box prominent">
+            <div class="slider-header">
+              <label>MASTER TEMPO</label>
+              <span class="val-display big" id="valTempo">120 BPM</span>
+            </div>
+            <input type="range" min="40" max="240" value="120" id="slTempo" data-cc="115">
+            <span class="cc-tag">CC 115 (TEMPO)</span>
+          </div>
+
+          <div class="ctrl-group">
+            <label>NOTE PRIORITY <span class="cc">CC 116</span></label>
+            <div class="btn-pair" id="grpArpPri">
+              <button class="opt-btn active" data-val="0">LAST</button>
+              <button class="opt-btn" data-val="1">LOW</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group">
+            <label>SYNTH PLAY/STOP <span class="cc">CC 117</span></label>
+            <div class="btn-pair" id="grpSeqPlay">
+              <button class="opt-btn active" data-val="0">STOP</button>
+              <button class="opt-btn" data-val="1">PLAY</button>
+            </div>
+          </div>
+
+          <div class="ctrl-group">
+            <label>ACTIVE PART / TRACK <span class="cc">CC 118</span></label>
+            <div class="btn-pair" id="grpTrackSel">
+              <button class="opt-btn active" data-val="0">TRK A</button>
+              <button class="opt-btn" data-val="1">TRK B</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. OSC DRAW & CHOP 16-STEP MATRIX -->
+      <section class="panel-card step-matrix-panel">
+        <div class="card-header highlight-teal">
+          <h2>9. OSC DRAW &amp; CHOP 16-STEP MATRIX</h2>
+          <span class="badge">WAVETABLE &amp; COMB</span>
+        </div>
+        <div class="step-matrix-content">
+          <!-- 16-Step Draw Wavetable Editor -->
+          <div class="matrix-block">
+            <div class="matrix-header">
+              <label>16-STEP DRAW WAVEFORM AMPLITUDES (-100% to +100%)</label>
+              <div class="matrix-actions">
+                <button class="mini-tool-btn" id="btnDrawSine">SINE</button>
+                <button class="mini-tool-btn" id="btnDrawTri">TRI</button>
+                <button class="mini-tool-btn" id="btnDrawRamp">RAMP</button>
+                <button class="mini-tool-btn" id="btnDrawPulse">PULSE</button>
+                <button class="mini-tool-btn" id="btnDrawRand">RAND</button>
+                <button class="mini-tool-btn" id="btnDrawReset">ZERO</button>
+              </div>
+            </div>
+            <div class="draw-steps-grid" id="drawStepsGrid">
+              <!-- 16 vertical step bars will be populated here -->
+            </div>
+          </div>
+
+          <!-- 16-Step Chop Comb Slicing Mask -->
+          <div class="matrix-block">
+            <div class="matrix-header">
+              <label>16-STEP CHOP COMB MASK (PADS 1–16)</label>
+              <div class="matrix-actions">
+                <button class="mini-tool-btn" id="btnChopAllOn">ALL ON</button>
+                <button class="mini-tool-btn" id="btnChopEven">EVEN</button>
+                <button class="mini-tool-btn" id="btnChopOdd">ODD</button>
+                <button class="mini-tool-btn" id="btnChopInvert">INVERT</button>
+              </div>
+            </div>
+            <div class="chop-pads-grid" id="chopPadsGrid">
+              <!-- 16 toggle step buttons populated here -->
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Bottom Section: Virtual Piano Keyboard & Sequencer -->
+    <footer class="app-footer">
+      <div class="keyboard-toolbar">
+        <div class="kb-tools-left">
+          <div class="octave-controls">
+            <button class="tool-btn" id="btnOctDown">OCT &minus;</button>
+            <span class="oct-display" id="dispOct">OCT 4</span>
+            <button class="tool-btn" id="btnOctUp">OCT +</button>
+          </div>
+          <button class="tool-btn toggle" id="btnLatch">
+            <span class="latch-light"></span>HOLD NOTE
+          </button>
+          <button class="tool-btn seq" id="btnArpSeq">
+            <span class="seq-light"></span>PLAY ACID SEQUENCE
+          </button>
+        </div>
+
+        <div class="active-note-indicator" id="dispActiveNote">
+          NOTE: <span class="note-name">READY</span>
+        </div>
+
+        <div class="kb-tools-right">
+          <label>VELOCITY: <span id="dispVel">100</span></label>
+          <input type="range" min="1" max="127" value="100" id="slVelocity" class="mini-slider">
+        </div>
+      </div>
+
+      <!-- The 25-key Virtual Piano -->
+      <div class="piano-keyboard" id="pianoKeyboard"></div>
+    </footer>
+  </div>
+
+  <script src="app.js?v=20261024_1"></script>
+</body>
+</html>

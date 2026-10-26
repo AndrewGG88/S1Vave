@@ -1,0 +1,7 @@
+3000 shot
+3200 midi 0x90 60 100
+3400 shot
+3600 midi 0x80 60 0
+3800 shot
+4000 midi 0xB0 74 120
+4200 shot

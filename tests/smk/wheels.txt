@@ -1,0 +1,15 @@
+# SMK-37: the wheels (raw ADC as on a unit: pitch rests ~535, mod up = lower)
+10 wheel 0 535
+10 wheel 1 620
+3000 dump
+3100 wheel 0 640
+3300 dump
+3400 wheel 0 445
+3600 dump
+3700 wheel 0 536
+3900 dump
+4000 wheel 1 474
+4200 dump
+4300 wheel 1 620
+4500 dump
+4600 end
