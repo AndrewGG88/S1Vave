@@ -66,8 +66,19 @@ Every aspect—from the classic oscillator core and sub-oscillator waveshapes, t
   - Two polyphonic tracks (A and B) sharing 256 steps with independent length, clock division, swing, and transpose for complex polymeters.
   - Step entry with piano roll view, live recording, sub-step ratchets (1–4), per-step probability, and motion recording.
   - 8 pattern slots saved directly in flash memory.
-- **64 Factory Presets**:
+- **99 Presets & Instant Recall**:
   - Programs 1–64 come pre-loaded with authentic factory sounds and patterns; slots 65–99 are available for user programs.
+  - Startup recall sequence preserves custom OSC DRAW wavetables and OSC CHOP comb masks.
+  - Direct bidirectional SysEx patch dump & restore support over USB-MIDI.
+- **Enhanced Arpeggiator & Hold**:
+  - Press and hold `ARP` button (450 ms) to toggle `HOLD` latch mode instantly.
+  - Dedicated Arp page (`Mode`, `Hold`, `Type`, `Rate`) and Arp Config page (`Note Priority: Low / Last`).
+  - Seamless key release and retrigger behavior in latch/hold mode.
+- **Dynamic Battery Level Monitoring**:
+  - Real-time SARADC battery tracking with 4-bar hysteresis and visual low-voltage blinking alert in the status bar header.
+- **S-1 Parity Velocity & Key Follow**:
+  - Dynamic velocity sensitivity scaling for VCA amplitude (~18 dB musical dynamic range).
+  - True 1V/oct chromatic filter keyboard tracking (scaled to Q8 semitones).
 - **USB-Audio & Class-Compliant USB-MIDI**:
   - 44.1 kHz / 16-bit stereo USB Audio with zero-glitch ring buffering.
   - Complete 1:1 MIDI Control Change implementation chart.
@@ -157,7 +168,7 @@ S1Vave maps parameters 1:1 to the S-1 MIDI specification:
 Connect your M-VAVE FM-1 via USB-C to your computer:
 
 ```bash
-python tools/fm1_install.py build/s1vave-1.0.fwsc --yes
+python tools/fm1_install.py build/s1vave-1.1.fwsc --yes
 ```
 
 The script communicates over USB HID, validates checksums, flashes the firmware sector by sector (~2 minutes), and automatically reboots the hardware into S1Vave.
@@ -206,10 +217,10 @@ git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 https://gitee.com/Jiel
 
 ### 4. Compile Firmware Package
 ```bash
-./build.sh --release 1.0
+./build.sh --release 1.1
 ```
 
-The build pipeline enforces strict JieLi AC791N hardware rules (integer-only fixed-point DSP, prohibition of 64-bit software divisions, and ROM collision prevention). The resulting `.fwsc` firmware binary will be placed at `build/s1vave-1.0.fwsc`.
+The build pipeline enforces strict JieLi AC791N hardware rules (integer-only fixed-point DSP, prohibition of 64-bit software divisions, and ROM collision prevention). The resulting `.fwsc` firmware binary will be placed at `build/s1vave-1.1.fwsc`.
 
 ---
 

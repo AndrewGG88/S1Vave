@@ -116,10 +116,10 @@ static uint32_t ota_unpack7(const uint8_t *in, uint32_t n, uint8_t *out, uint32_
     return o;
 }
 
-static uint8_t ota_msg[8 + 32], ota_wire[2 + 48];
+static uint8_t ota_msg[8 + 128], ota_wire[2 + 160];
 static uint8_t ota_dec[OTA_FRAME_MAX];           /* decoded host message */
 
-static int ota_send_msg(uint32_t cmd, const uint8_t *body, uint32_t n)   /* n <= 32 */
+static int ota_send_msg(uint32_t cmd, const uint8_t *body, uint32_t n)   /* n <= 128 */
 {
     uint32_t i, s = 0, w;
     ota_msg[0] = 0;
@@ -175,12 +175,19 @@ static uint32_t ota_take(void)
     return d;
 }
 
-/* main loop, outside a session: answer handshakes */
+#ifndef OTA_APP_SYSEX
+#define OTA_APP_SYSEX(cmd, body, len) ((void)0)
+#endif
+
+/* main loop, outside a session: answer handshakes and preset SysEx */
 static void ota_service(void)
 {
     uint32_t d = ota_take();
+    if (!d) return;
     if (d == 7u && ota_dec[2] == 0x11)
         ota_reply_identity();
+    else if (d >= 7u)
+        OTA_APP_SYSEX(ota_dec[2], ota_dec + 6, d - 7u);
 }
 
 /* one read request (3 tries x 5 s); data -> dst */

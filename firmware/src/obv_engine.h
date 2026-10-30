@@ -227,6 +227,7 @@ static void voice_trigger(uint32_t part, uint32_t note, uint32_t vel)
         int legato = v->gate;
         if (legato) {
             v->note = (uint8_t)note;
+            v->vel = (uint8_t)vel;
             v->target16 = (int32_t)note << 16;
             if (pv[P_PORTA_MODE] == PORTA_OFF) v->pitch16 = v->target16;
             if (pv[P_ENV_TRG] == TRIG_GATE_TRIG) {
@@ -244,6 +245,7 @@ static void voice_trigger(uint32_t part, uint32_t note, uint32_t vel)
         if (legato) {
             for (uint32_t i = 0; i < 4; i++) {
                 vc[i].note = (uint8_t)note;
+                vc[i].vel = (uint8_t)vel;
                 vc[i].target16 = (int32_t)note << 16;
                 if (pv[P_PORTA_MODE] == PORTA_OFF) vc[i].pitch16 = vc[i].target16;
                 if (pv[P_ENV_TRG] == TRIG_GATE_TRIG) {
@@ -280,6 +282,7 @@ static void voice_trigger(uint32_t part, uint32_t note, uint32_t vel)
                 if (active) {
                     uint32_t cn = (uint32_t)clampi((int32_t)note + shifts[i], 0, 127);
                     vc[i].note = (uint8_t)cn;
+                    vc[i].vel = (uint8_t)vel;
                     vc[i].target16 = (int32_t)cn << 16;
                     if (pv[P_PORTA_MODE] == PORTA_OFF) vc[i].pitch16 = vc[i].target16;
                     if (pv[P_ENV_TRG] == TRIG_GATE_TRIG) {
@@ -488,6 +491,19 @@ static inline uint32_t part_sus(uint32_t p) { return ctl_sustain || (ctl_hold >>
 
 static void ev_note_on(uint32_t p, uint32_t note, uint32_t vel)
 {
+    if (part_sus(p) && nheld[p] > 0) {
+        uint32_t any_phys = 0;
+        for (uint32_t i = 0; i < nheld[p]; i++) {
+            if (held[p][i].phys) { any_phys = 1; break; }
+        }
+        if (!any_phys) {
+            nheld[p] = 0;
+            if (ctl_arp_on) {
+                arp_stop_note(p);
+                ctl_arp_restart = 1;
+            }
+        }
+    }
     held_remove(p, note);
     if (nheld[p] == NHELD) {
         for (uint32_t i = 1; i < NHELD; i++) held[p][i - 1u] = held[p][i];
@@ -675,7 +691,8 @@ static void block_globals(part_t *g)
     int32_t fa = (int32_t)pv[P_FENV_AMT];
     if (fa > 80) fa = 80 + ((fa - 80) * 6) / 8;
     g->fenv_amt = fa;
-    g->keytrk = pv[P_KEYTRK];
+    /* Key tracking: scaled to Q8 semitones (127 -> 256 = 100% 1V/oct chromatic follow) */
+    g->keytrk = ((int32_t)pv[P_KEYTRK] << 8) / 127;
 
     uint32_t pd_idx = pv[P_LFO_PITCH] & 127u;
     g->lfo_pd = (int32_t)LFO_PITCH_DEPTH[pd_idx];
@@ -804,6 +821,10 @@ static void voice_block(voice_t *v, uint32_t card)
     } else {
         a = v->ae.level >> 9;
     }
+    /* S-1 Parity Velocity Sensitivity: scales VCA amplitude with ~18 dB musical dynamic range */
+    int32_t vel = v->vel ? (int32_t)v->vel : 100;
+    int32_t vel_q15 = 4096 + (vel * 225);
+    a = (a * vel_q15) >> 15;
     v->amp1 = (a * g->gain_q12) >> 12;
     ui_vlevel[card] = a;
     ui_vnote[card] = v->note;

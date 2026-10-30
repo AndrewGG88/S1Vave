@@ -13,7 +13,9 @@
  *
  * Integers only (no FPU, no 64-bit division); tests/host.c runs this on a computer. */
 static void app_idle(void);
+static void app_sysex(unsigned int cmd, const unsigned char *body, unsigned int len);
 #define LCD_IDLE() app_idle()                   /* (lcd.c: while the DMA runs) */
+#define OTA_APP_SYSEX(c, b, l) app_sysex(c, b, l)
 #include "platform.c"
 #include "obv_dsp.h"
 #include "obv_params.h"
@@ -64,7 +66,7 @@ static uint8_t erase_on[128];                   /* notes erased while their key 
 static uint32_t erase_pos = 0xFFFFFFFFu;
 static uint32_t pen = 60;                       /* the note a tapped empty step gets: the last one played */
 static int32_t step_held = -1;                  /* the step whose white key is held in the step view, -1 none */
-static uint32_t step_held_t, step_turned, step_midi, toast_t;
+static uint32_t step_held_t, step_turned, step_midi, toast_t, arp_btn_down, arp_btn_t;
 static uint8_t audition[SEQ_CHORD], audition_part;   /* the held step's notes sounding (stopped: you hear what you hold) */
 static const char *toast;
 static int is_seq_page(uint32_t pg) { return pg == PG_SEQ; }
@@ -453,6 +455,7 @@ static void param_value(char *s, uint32_t p, uint32_t v)   /* <= 7 characters */
         else if (p == P_ATTACK) fmt_ms(s, ATT_MS_X10[v & 127u]);
         else if (p == P_DECAY) fmt_ms(s, DEC_MS_X10[v & 127u]);
         else if (p == P_RELEASE) fmt_ms(s, REL_MS_X10[v & 127u]);
+        else if (p == P_REV_PRE) { fmt_u(s, v); scat(s, "ms"); }
         else fmt_ms(s, TIME_MS_X10[v & 127u]);
         break;
     case K_HZ:
@@ -528,8 +531,8 @@ static void draw_header(void)
         uint32_t fx = live.v[P_CHO_MODE] != CHO_OFF || live.v[P_DLY_LVL] || live.v[P_REV_LVL], trk = seq_trk;
         uint32_t n = slen(POLY_NAME[pv[P_POLY_MODE] % NPOLY_MODE])
                    + ((hold >> ed_b() & 1u) ? 5u : 0u) + (ctl_seq_run ? 4u : 0u) + (rec ? 4u : 0u);
-        if (trk && n + 2u <= 23u) n += 2u; else trk = 0;
-        if (fx && n + 3u <= 23u) n += 3u; else fx = 0;
+        if (trk && n + 2u <= 19u) n += 2u; else trk = 0;
+        if (fx && n + 3u <= 19u) n += 3u; else fx = 0;
         scat(tags, POLY_NAME[pv[P_POLY_MODE] % NPOLY_MODE]);
         if (fx) scat(tags, " FX");
         if (hold >> ed_b() & 1u) scat(tags, " HOLD");
@@ -683,16 +686,24 @@ static void draw_page(void)
                 k[i].max = 1;
                 scat(k[i].value, ctl_arp_on ? "ON" : "OFF");
             } else if (i == 1) {
+                k[i].label = "HOLD";
+                k[i].v = (ctl_hold >> ed_b() & 1u);
+                k[i].max = 1;
+                scat(k[i].value, (ctl_hold >> ed_b() & 1u) ? "ON" : "OFF");
+            } else if (i == 2) {
                 k[i].label = "TYPE";
                 k[i].v = ctl_arp_type % NARP_TYPE;
                 k[i].max = NARP_TYPE - 1;
                 scat(k[i].value, ARP_TYPE_NAME[ctl_arp_type % NARP_TYPE]);
-            } else if (i == 2) {
+            } else {
                 k[i].label = "RATE";
                 k[i].v = ctl_arp_rate % NARP_RATE;
                 k[i].max = NARP_RATE - 1;
                 scat(k[i].value, ARP_RATE_NAME[ctl_arp_rate % NARP_RATE]);
-            } else {
+            }
+        } else if (page == PG_ARP_CFG && !layer) {
+            k[i].present = (i == 0);
+            if (i == 0) {
                 k[i].label = "NOTE PRI";
                 k[i].v = ctl_note_pri & 1u;
                 k[i].max = 1;
@@ -955,7 +966,7 @@ static void pen_add(uint32_t note)
     pen = note;
 }
 
-/* GLO held: white key 1 / 2 mute track A / B, 5 / 6 solo it, the last (G5) taps the tempo */
+/* GLO held: white key 1 / 2 mute track A / B, 5 / 6 solo it, 13 (D5) dumps active preset SysEx+CC, the last (G5) taps the tempo */
 static void glo_key(uint32_t k)
 {
     static char msg[16];
@@ -968,6 +979,11 @@ static void glo_key(uint32_t k)
         pat.trk[t].mute = 0;
         pat.trk[t ^ 1u].mute = !solo;
         say(solo ? "SOLO OFF" : t ? "SOLO B" : "SOLO A");
+    } else if (s2 == 12) {                      /* GLO + D5: dump active preset SysEx + CCs to USB-MIDI */
+        uint8_t req = (uint8_t)prog;
+        app_sysex(0x20u, &req, 1u);
+        dump_cursor = 0;
+        say("SYX+CC SENT");
     } else if (s2 == 15) {                      /* tap tempo: the mean of the last taps */
         tap_t[2] = tap_t[1]; tap_t[1] = tap_t[0]; tap_t[0] = fm1_ms;
         if (tap_t[1] && tap_t[0] - tap_t[1] < 2000u) {
@@ -1612,7 +1628,29 @@ static void midi_in(uint32_t notes_only)
                 say(ed_b() ? "TRACK B" : "TRACK A");
                 dirty_hdr = dirty_page = dirty_tags = 1;
             }
-            else if (d1 == 119u) { dump_cursor = 0; }
+            else if (d1 == 119u) {
+                if (d2 == 127u) {
+                    patch_t fp;
+                    patch_from_factory(&fp, prog < NFACT ? &FACTORY[prog] : &FACT_INIT);
+                    if (prog >= NFACT && memcmp(live.v, fp.v, NPARAM) == 0) {
+                        psect[prog / PS_N].used[prog % PS_N] = 0;
+                    } else {
+                        prog_put(prog, &live);
+                    }
+                    if (!ctl_seq_run) {
+                        psect_save(prog / PS_N, &psect[prog / PS_N], sizeof psect[0]);
+                        ps_dirty &= ~(1u << (prog / PS_N));
+                    }
+                    edited = 0;
+                    set.prog = (uint8_t)prog;
+                    set_dirty = 1;
+                    set_t = fm1_ms;
+                    say("SAVED");
+                    dirty_hdr = dirty_page = dirty_tags = 1;
+                } else {
+                    dump_cursor = 0;
+                }
+            }
             else if (d1 == 120u || d1 == 123u) ctl_panic = 1;
             else if (cc_map[d1]) {
                 midi_in_active = 1;
@@ -1625,6 +1663,67 @@ static void midi_in(uint32_t notes_only)
                 midi_in_active = 0;
             }
         }
+    }
+}
+
+static void app_sysex(uint32_t cmd, const uint8_t *body, uint32_t len)
+{
+    if (cmd == 0x20u && len >= 1u) {
+#ifndef OBV_HOST
+        uint32_t s = body[0] == 0x7Fu ? prog : body[0];
+        uint8_t pkt[122];
+        patch_t p;
+        if (s >= NPROG) return;
+        pkt[0] = (uint8_t)s;
+        pkt[1] = (psect[s / PS_N].used[s % PS_N] ? 1u : 0u) | 2u;
+        if (body[0] == 0x7Fu || (s == prog && edited)) { p = live; pkt[1] |= 1u; }
+        else prog_get(s, &p);
+        memcpy(pkt + 2, &p, sizeof(patch_t));
+        if (body[0] == 0x7Fu || s == prog) {
+            memcpy(pkt + 82, pat.draw_table, 32);
+            memcpy(pkt + 114, pat.chop_mask, 8);
+        } else if (s < NFACT) {
+            memcpy(pkt + 82, FACT_WAVE[s].draw, 32);
+            memcpy(pkt + 114, FACT_WAVE[s].chop, 8);
+        } else {
+            uint32_t k;
+            memset(pkt + 82, 0, 32);
+            for (k = 0; k < 8u; k++) pkt[114 + k] = 0xFFu;
+        }
+        ota_send_msg(0x21u, pkt, sizeof pkt);
+#endif
+    } else if (cmd == 0x21u && len >= 82u) {
+        uint32_t s = body[0] == 0x7Fu ? prog : body[0], i;
+        uint8_t flags = body[1];
+        patch_t p, fp;
+        if (s >= NPROG) return;
+        memcpy(&p, body + 2, sizeof(patch_t));
+        for (i = 0; i < NPARAM; i++)
+            if (p.v[i] > PDEF[i].max) p.v[i] = PDEF[i].max;
+        patch_from_factory(&fp, s < NFACT ? &FACTORY[s] : &FACT_INIT);
+        if ((flags & 1u) && !(s >= NFACT && memcmp(p.v, fp.v, NPARAM) == 0)) {
+            prog_put(s, &p);
+        } else {
+            psect[s / PS_N].used[s % PS_N] = 0;
+        }
+        if (!ctl_seq_run) {
+            psect_save(s / PS_N, &psect[s / PS_N], sizeof psect[0]);
+            ps_dirty &= ~(1u << (s / PS_N));
+        }
+        if (body[0] == 0x7Fu || s == prog || (flags & 4u)) {
+            prog = s;
+            set.prog = (uint8_t)s;
+            live = p;
+            edited = 0;
+            set_dirty = 1;
+            set_t = fm1_ms;
+            if (len >= 122u) {
+                memcpy(pat.draw_table, body + 82, 32);
+                memcpy(pat.chop_mask, body + 114, 8);
+            }
+        }
+        say("SYX SAVED");
+        dirty_hdr = dirty_page = dirty_tags = 1;
     }
 }
 
@@ -1669,8 +1768,8 @@ static void app_main(void)
     if (set.midi_ch > 16u) set.midi_ch = 0;
     ctl_tempo = set.tempo;
     ctl_tune8 = set.tune * 256 / 100;
-    load_program(set.prog);
     load_pattern(set.pat);
+    load_program(set.prog);
     b_load();
     slot_lens_read();
     slot_sel = set.pat;
@@ -1821,13 +1920,30 @@ static void app_main(void)
         if (b & (1u << BTN_ENV)) np = cycle_page(PG_ADSR, 2);
         if (b & (1u << BTN_LFO)) np = cycle_page(PG_LFO, 3);
         if (b & (1u << BTN_ARP)) {
-            if (page == PG_ARP) {
+            arp_btn_down = 1;
+            arp_btn_t = fm1_ms;
+            if (page != PG_ARP && page != PG_ARP_CFG) {
+                np = PG_ARP;
+            } else if (page == PG_ARP) {
+                np = PG_ARP_CFG;
+            } else {
                 ctl_arp_on ^= 1;
                 say(ctl_arp_on ? "ARP ON" : "ARP OFF");
-            } else {
                 np = PG_ARP;
             }
             dirty_tags = 1;
+        }
+        if (arp_btn_down && (fm1_in.buttons & (1u << BTN_ARP))) {
+            if (fm1_ms - arp_btn_t >= 450u) {
+                arp_btn_down = 0;
+                ctl_hold ^= (1u << ed_b());
+                hold = ctl_hold;
+                say((ctl_hold >> ed_b() & 1u) ? "HOLD ON" : "HOLD OFF");
+                dirty_tags = dirty_hdr = 1;
+            }
+        }
+        if (rel & (1u << BTN_ARP)) {
+            arp_btn_down = 0;
         }
         if (b & (1u << BTN_PLAY)) {             /* start from step 1 / stop (a take ends with it) */
             if (ctl_seq_run) { ctl_seq_run = 0; if (rec == REC_ON) rec = REC_OFF; }
@@ -1962,12 +2078,20 @@ static void app_main(void)
                     ctl_arp_on = clampi((int32_t)ctl_arp_on + e, 0, 1);
                     say(ctl_arp_on ? "ARP ON" : "ARP OFF");
                 } else if (k == 1) {
+                    if (e > 0) ctl_hold |= (1u << ed_b());
+                    else if (e < 0) ctl_hold &= ~(1u << ed_b());
+                    hold = ctl_hold;
+                    say((ctl_hold >> ed_b() & 1u) ? "HOLD ON" : "HOLD OFF");
+                } else if (k == 2) {
                     ctl_arp_type = (uint32_t)clampi((int32_t)ctl_arp_type + e, 0, NARP_TYPE - 1);
                     say(ARP_TYPE_NAME[ctl_arp_type]);
-                } else if (k == 2) {
+                } else {
                     ctl_arp_rate = (uint32_t)clampi((int32_t)ctl_arp_rate + e, 0, NARP_RATE - 1);
                     say(ARP_RATE_NAME[ctl_arp_rate]);
-                } else {
+                }
+                dirty_hdr = dirty_tags = 1;
+            } else if (page == PG_ARP_CFG && !layer) {
+                if (k == 0) {
                     ctl_note_pri = clampi((int32_t)ctl_note_pri + e, 0, 1);
                     say(ctl_note_pri ? "PRI: LOW" : "PRI: LAST");
                 }
@@ -2073,7 +2197,7 @@ static void app_main(void)
         fm1_led_key(BTN_LFO, page == PG_LFO || page == PG_LFO_MOD || page == PG_RISER);
         fm1_led_key(BTN_FX, page == PG_FX_MIX || page == PG_DELAY || page == PG_REVERB);
         fm1_led_key(BTN_GLO, page == PG_VOICE || page == PG_GLOBAL);
-        fm1_led_key(BTN_ARP, ctl_arp_on || (hold >> ed_b() & 1u) || page == PG_ARP);
+        fm1_led_key(BTN_ARP, ctl_arp_on || (hold >> ed_b() & 1u) || page == PG_ARP || page == PG_ARP_CFG);
         fm1_led_key(BTN_SAVE, save_armed);
 #if BOARD_SMK37
         smk_leds();                             /* the step pads, FADER BANK, < > */
@@ -2128,6 +2252,16 @@ static void app_main(void)
                 if (dp) draw_seq_knobs();
             }
         } else {
+        static uint32_t t_batt_check;
+        static int32_t last_drawn_bars = -1;
+        if (fm1_ms - t_batt_check >= 1000u) {
+            t_batt_check = fm1_ms;
+            int32_t cur_b = platform_battery_bars();
+            if (cur_b != last_drawn_bars || (cur_b <= 0 && ((fm1_ms / 500u) & 1u))) {
+                last_drawn_bars = cur_b;
+                dirty_hdr = 1;
+            }
+        }
         if (dirty_hdr && fm1_ms - t_hdr >= 30u) { dirty_hdr = 0; t_hdr = fm1_ms; draw_header(); }
         if (dirty_page && fm1_ms - t_page >= 30u) { dirty_page = 0; t_page = fm1_ms; draw_page(); }
         if (dirty_tags) { dirty_tags = 0; draw_tags(); }

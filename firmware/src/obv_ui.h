@@ -163,6 +163,24 @@ static void cv_stripes(int32_t y0, int32_t band, int32_t gap, int32_t x_to, int3
 /* ---- the parts of the screen (the app decides when) */
 #define C_TRK_B RGB(255, 150, 40)               /* track B's orange */
 /* b: the panel is on track B's own sound (its program number and name in B's orange, a B before the name) */
+static void draw_battery_icon(int32_t x0, int32_t y0, int32_t bars)
+{
+    cv_rect(x0, y0, 14, 1, C_DIMT);
+    cv_rect(x0, y0 + 7, 14, 1, C_DIMT);
+    cv_rect(x0, y0, 1, 8, C_DIMT);
+    cv_rect(x0 + 13, y0, 1, 8, C_DIMT);
+    cv_rect(x0 + 14, y0 + 2, 2, 4, C_DIMT);
+    cv_rect(x0 + 1, y0 + 1, 12, 6, C_PANEL);
+    uint16_t c = (bars >= 3) ? C_AMBER : (bars == 2) ? C_ORANGE : C_RED;
+    if (bars <= 0) {
+        if ((fm1_ms / 500u) & 1u) cv_rect(x0 + 2, y0 + 2, 2, 4, C_RED);
+        return;
+    }
+    for (int32_t b = 0; b < bars && b < 4; b++) {
+        cv_rect(x0 + 2 + b * 3, y0 + 2, 2, 4, c);
+    }
+}
+
 static void ui_header(uint32_t prog, const uint8_t *name, uint32_t edited, const char *tags, uint32_t b)
 {
     char n[PATCH_NAME + 2];
@@ -177,6 +195,7 @@ static void ui_header(uint32_t prog, const uint8_t *name, uint32_t edited, const
     cv_text(b ? 66 : 54, 4, &FONT_S, n, b ? C_TRK_B : C_CREAM);
     cv_text(54, 22, &FONT_S, tags, C_DIMT);
     draw_logo_small(240 - LOGO_W - 6, 6);
+    draw_battery_icon(218, 26, platform_battery_bars());
     cv_rect(0, 42, 240, 1, C_RULE);
     cv_blit(0, 0);
 }
@@ -566,7 +585,7 @@ static void splash_frame(uint32_t fade, uint32_t sub)
     const char *t1 = "8-VOICE TWEAK SYNTH";
     const char *t2 = "FOR M-VAVE FM-1";
     const char *t_by = "BY ANDREW GG";
-    const char *t_ver = "VERSION 1.0  *  OPEN SOURCE";
+    const char *t_ver = "VERSION 1.1  *  OPEN SOURCE";
 
     /* Strip 1: S1VAVE Logo + Subtitles + Rule (Rows 0..119) */
     cv_begin(240, 120, C_PANEL);

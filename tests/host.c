@@ -80,6 +80,7 @@ static uint64_t host_leds;                      /* bit id: LED id lit (0..13 but
 static void fm1_led_key(uint32_t id, int on) { if (on) host_leds |= (uint64_t)1 << id; else host_leds &= ~((uint64_t)1 << id); }
 static uint64_t host_glow;                      /* the dim layer (not in the film log) */
 static void fm1_led_key_glow(uint32_t id, int on) { if (on) host_glow |= (uint64_t)1 << id; else host_glow &= ~((uint64_t)1 << id); }
+static inline int32_t platform_battery_bars(void) { return 4; }
 
 /* the screen: 240 x 240 RGB565, as the ST7789 gets it (gfx.c sends the bytes swapped) */
 static uint16_t fb[240 * 240];

@@ -396,6 +396,66 @@ extern void isr_alnk0(void);
 
 /* ---- the main loop's duties: watchdog, USB, the installer's update request, the MASTER knob */
 static int32_t knob_avg = 512 * 16;
+static int32_t batt_raw;
+static uint32_t batt_poll_t;
+static int32_t batt_bars_last = 4;
+
+static void batt_boot(void)
+{
+    uint32_t i;
+    (void)fm1_adc_read(FM1_ADC_BATT);
+    int32_t sum = 0, count = 0;
+    for (i = 0; i < 4u; i++) {
+        int32_t b = fm1_adc_read(FM1_ADC_BATT);
+        if (b > 0) { sum += b; count++; }
+    }
+    if (count > 0) batt_raw = (sum / count) * 16;
+}
+
+static inline void batt_poll(void)
+{
+    if (fm1_ms - batt_poll_t >= 500u) {
+        batt_poll_t = fm1_ms;
+        (void)fm1_adc_read(FM1_ADC_BATT);
+        int32_t b = fm1_adc_read(FM1_ADC_BATT);
+        if (b > 0) {
+            if (!batt_raw) batt_raw = b * 16;
+            else batt_raw += (b * 16 - batt_raw) / 16;
+        }
+    }
+}
+
+static inline int32_t platform_battery_bars(void)
+{
+    if (usb.config) return 4;
+    int32_t val = batt_raw / 16;
+    if (val == 0) return 4;
+
+    /* Calibrated FM-1 SARADC PB1 thresholds with hysteresis:
+     * Full / 4 bars: >= 585 (drop at 578)
+     * Good / 3 bars: >= 555 (drop at 548)
+     * Mid  / 2 bars: >= 525 (drop at 518)
+     * Low  / 1 bar:  >= 490 (drop at 482)
+     * Crit / 0 bars: < 482 (blinking)
+     */
+    int32_t b = batt_bars_last;
+    if (b >= 4) {
+        if (val < 578) b = 3;
+    } else if (b == 3) {
+        if (val >= 588) b = 4;
+        else if (val < 548) b = 2;
+    } else if (b == 2) {
+        if (val >= 558) b = 3;
+        else if (val < 518) b = 1;
+    } else if (b == 1) {
+        if (val >= 528) b = 2;
+        else if (val < 482) b = 0;
+    } else {
+        if (val >= 490) b = 1;
+    }
+    batt_bars_last = b;
+    return b;
+}
 
 static void master_boot(void)
 {
@@ -434,6 +494,7 @@ static void platform_poll(void)
     }
     if (fm1_ms >= 30000u && bootguard.pending)
         bootguard_clear(&bootguard);            /* 30 s up: this firmware boots */
+    batt_poll();
     if ((a = fm1_adc_read(FM1_ADC_MASTER)) >= 0) {
         uint32_t k10;
         knob_avg += (a * 16 - knob_avg) / 8;
@@ -497,6 +558,7 @@ void fm1_cstart(void)
     fm1_input_init();
     fm1_adc_init();
     master_boot();
+    batt_boot();
 #if BOARD_SMK37
     smk_trim_read();                            /* (after fm1_input_init: it sets the defaults first) */
     smk_owner_check();

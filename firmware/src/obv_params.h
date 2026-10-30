@@ -313,7 +313,8 @@ enum {
     PG_VOICE,       /* Poly Mode, Porta Mode, Transpose, Volume */
     PG_GLOBAL,      /* Tempo, MIDI Ch, Master Prob, Pattern Scale (drawn by hand) */
 
-    PG_ARP,         /* Arpeggiator Page: Mode, Type, Rate, Hold */
+    PG_ARP,         /* Arpeggiator Page: Mode, Hold, Type, Rate */
+    PG_ARP_CFG,     /* Arpeggiator Config: Note Priority */
     PG_SEQ,         /* Sequencer view (drawn by hand) */
     NPAGE
 };
@@ -333,10 +334,11 @@ static const page_t PAGE[NPAGE] = {
     [PG_RISER]      = {"RISER",     {P_RISER_MODE, P_RISER_RESO, P_RISER_SHAPE, P_RISER_LVL}},
     [PG_FX_MIX]     = {"FX MIX",    {P_CHO_MODE, P_DLY_LVL, P_REV_LVL, P_DLY_TIME}},
     [PG_DELAY]      = {"DELAY",     {P_DLY_LVL, P_DLY_TIME, P_DLY_FB, P_DLY_SYNC}},
-    [PG_REVERB]     = {"REV / CHO", {P_REV_LVL, P_REV_TIME, P_REV_TYPE, P_CHO_MODE}},
+    [PG_REVERB]     = {"REVERB",    {P_REV_LVL, P_REV_TIME, P_REV_TYPE, P_REV_PRE}},
     [PG_VOICE]      = {"VOICE",     {P_POLY_MODE, P_PORTA_MODE, P_TRANSPOSE, P_VOLUME}},
     [PG_GLOBAL]     = {"GLOBAL",    {-1, -1, -1, -1}},
     [PG_ARP]        = {"ARPEGGIO",  {-1, -1, -1, -1}},
+    [PG_ARP_CFG]    = {"ARP CONFIG",{-1, -1, -1, -1}},
     [PG_SEQ]        = {"SEQUENCER", {-1, -1, -1, -1}},
 };
 
