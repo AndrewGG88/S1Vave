@@ -358,6 +358,7 @@ static void patch_from_factory(patch_t *p, const factory_t *f)
     uint32_t i;
     patch_defaults(p);
     while (s[0] != 255u) { p->v[s[0]] = s[1]; s += 2; }
+    p->v[P_TRANSPOSE] = 64;
     for (i = 0; i < PATCH_NAME && f->name[i]; i++) p->v[NPARAM + i] = (uint8_t)f->name[i];
 }
 

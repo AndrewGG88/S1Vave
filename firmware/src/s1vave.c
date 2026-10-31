@@ -142,8 +142,12 @@ static uint8_t cc_map[128];                     /* MIDI CC -> parameter + 1, 0 =
 static void prog_get(uint32_t n, patch_t *p)    /* program n: the user's, else the factory's (65-99: INIT) */
 {
     n %= NPROG;
-    if (psect[n / PS_N].used[n % PS_N]) *p = psect[n / PS_N].p[n % PS_N];
-    else patch_from_factory(p, n < NFACT ? &FACTORY[n] : &FACT_INIT);
+    if (psect[n / PS_N].used[n % PS_N]) {
+        *p = psect[n / PS_N].p[n % PS_N];
+        if (p->v[P_TRANSPOSE] == 60) p->v[P_TRANSPOSE] = 64;
+    } else {
+        patch_from_factory(p, n < NFACT ? &FACTORY[n] : &FACT_INIT);
+    }
 }
 
 static void prog_put(uint32_t n, const patch_t *p)   /* program n is the user's now; saved when quiet */
@@ -2028,11 +2032,25 @@ static void app_main(void)
             set.prog = (uint8_t)prog; set_dirty = 1; set_t = fm1_ms;
             dirty_hdr = dirty_page = dirty_tags = dirty_steps = 1;
         }
-        if ((e = fm1_enc_take(ENC_ALGORITHM)) != 0) {   /* ALGORITHM: the track (as sloopDX) */
-            uint32_t t = e > 0 ? 1u : 0u;
-            if (t != seq_trk) { seq_trk = t; step_held = -1; audition_off(); }
-            say(t ? (pat.trk[1].len ? (pat.trk[1].B_PROG ? "TRACK B: ITS OWN SOUND" : "TRACK B") : is_seq_page(page) ? "TRACK B OFF: " NM_K1 " = ON" : "TRACK B IS OFF: SEQ + " NM_KNOB4) : "TRACK A");
-            dirty_page = dirty_steps = dirty_tags = dirty_hdr = 1;
+        if ((e = fm1_enc_take(ENC_ALGORITHM)) != 0) {   /* ALGORITHM: the track, or OCT held = Key Transpose */
+            if ((fm1_in.buttons >> BTN_OCT_DOWN & 1u) || (fm1_in.buttons >> BTN_OCT_UP & 1u)) {
+                int32_t cur = (int32_t)live.v[P_TRANSPOSE];
+                int32_t next = clampi(cur + e, 4, 124);
+                set_param(P_TRANSPOSE, next);
+                static char msg[24];
+                msg[0] = 0; scat(msg, "TRANSP ");
+                int32_t st = next - 64;
+                if (st > 0) scat(msg, "+");
+                fmt_s(msg + slen(msg), st);
+                scat(msg, " st");
+                say(msg);
+                dirty_page = 1;
+            } else {
+                uint32_t t = e > 0 ? 1u : 0u;
+                if (t != seq_trk) { seq_trk = t; step_held = -1; audition_off(); }
+                say(t ? (pat.trk[1].len ? (pat.trk[1].B_PROG ? "TRACK B: ITS OWN SOUND" : "TRACK B") : is_seq_page(page) ? "TRACK B OFF: " NM_K1 " = ON" : "TRACK B IS OFF: SEQ + " NM_KNOB4) : "TRACK A");
+                dirty_page = dirty_steps = dirty_tags = dirty_hdr = 1;
+            }
         }
         if ((e = fm1_enc_take(ENC_SELECT)) != 0) {   /* SELECT: the tempo, or OCT held = Key Transpose */
             if ((fm1_in.buttons >> BTN_OCT_DOWN & 1u) || (fm1_in.buttons >> BTN_OCT_UP & 1u)) {
