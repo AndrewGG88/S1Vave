@@ -8,15 +8,16 @@ This document lists the complete MIDI Control Change (CC) mapping for **S1Vave**
 
 | CC # | Parameter | Range | Values / Description |
 |:---:|:---|:---:|:---|
-| **1** | Modulation Wheel | `0–127` | LFO pitch & filter modulation depth |
+| **1** | Modulation Wheel | `0–127` | LFO pitch modulation depth (vibrato) |
 | **5** | Portamento Time | `0–127` | Glide speed between notes (0 = fastest, 127 = slowest) |
 | **7** | Master Volume | `0–127` | Master output level (audio taper) |
+| **17** | LFO Mod Depth | `0–127` | LFO pitch modulation sensitivity |
 | **18** | Pitch Bend Sensitivity | `0–24` | Pitch bend wheel range in semitones |
 | **31** | Portamento Mode | `0–2` | `0 = OFF`, `1 = ON`, `2 = AUTO` (legato glide) |
 | **64** | Sustain / Damper Pedal | `0–127` | $\ge 64$ holds notes |
 | **65** | Portamento Switch | `0–127` | $\ge 64$ enables portamento |
 | **76** | Fine Tune | `0–127` | Master pitch fine tune ($-64 \dots +63$, center = 64) |
-| **77** | Key Transpose | `0–120` | Transpose ($-60 \dots +60$ semitones, center = 60) |
+| **77** | Key Transpose | `4–124` | Transpose ($-60 \dots +60$ semitones, center = 64) |
 | **80** | Polyphony Mode | `0–3` | `0 = MONO`, `1 = UNISON` (8-voice stacked), `2 = POLY` (8-voice dynamic), `3 = CHORD` |
 | **120** | All Sound Off | `0` | Immediately mutes all voices |
 | **123** | All Notes Off | `0` | Releases all held notes |

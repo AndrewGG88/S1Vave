@@ -187,14 +187,7 @@ static void seq_tick(void)
         if (r->cnt >= r->dur) {                 /* the next step */
             uint32_t base = q / DIV_PER_QUARTER[k->div % NDIV], sw;
             r->cnt -= r->dur;
-            if (pat.step_loop_start <= pat.step_loop_end && pat.step_loop_end < len) {
-                if (r->step >= pat.step_loop_end || r->step < pat.step_loop_start)
-                    r->step = pat.step_loop_start;
-                else
-                    r->step++;
-            } else {
-                r->step = r->step + 1u >= len ? 0u : r->step + 1u;
-            }
+            r->step = r->step + 1u >= len ? 0u : r->step + 1u;
             if (t == 0u && r->step == 0u && ctl_pat_swap) {   /* track A from the top: the next pattern */
                 if (ctl_pat_keep) pat_old = pat;
                 pat = pat_q;

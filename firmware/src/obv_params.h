@@ -87,7 +87,7 @@ enum {
     P_PORTA_MODE,       /* Portamento Mode: 0=OFF, 1=ON, 2=Auto [CC 31] */
     P_PORTA_TIME,       /* Portamento Time: 0..127 [CC 5] */
     P_PORTA_SW,         /* Portamento Switch: 0=OFF, 1=ON [CC 65] */
-    P_TRANSPOSE,        /* Key Transpose: 0..120 (-60..+60 semitones) [CC 77] */
+    P_TRANSPOSE,        /* Key Transpose: 4..124 (-60..+60 semitones, center 64) [CC 77] */
     P_VOLUME,           /* Master Volume: 0..127 [CC 7] */
 
     /* 53..58: CHORD CONFIG */
@@ -189,7 +189,7 @@ static const pdef_t PDEF[NPARAM] = {
     [P_LFO_TRIG]    = {"KEY TRG", 1,   0,           K_ONOFF,   105},
     [P_LFO_MODE]    = {"FAST/N",  1,   0,           K_ONOFF,   79},
     [P_LFO_PITCH]   = {"PITCH",   127, 0,           K_NUM,     13},
-    [P_MOD_DEPTH]   = {"MOD DPT", 127, 0,           K_NUM,     1},
+    [P_MOD_DEPTH]   = {"MOD DPT", 127, 0,           K_NUM,     17},
     [P_OSC_BEND]    = {"OSC BND", 24,  2,           K_NUM,     18},
 
     /* RISER */
@@ -216,7 +216,7 @@ static const pdef_t PDEF[NPARAM] = {
     [P_PORTA_MODE]  = {"PORTA M", 2,   PORTA_OFF,   K_PORTAM,  31},
     [P_PORTA_TIME]  = {"PORTA T", 127, 30,          K_MS,      5},
     [P_PORTA_SW]    = {"PORTA",   1,   0,           K_ONOFF,   65},
-    [P_TRANSPOSE]   = {"TRANSP",  120, 60,          K_SEMI,    77},
+    [P_TRANSPOSE]   = {"TRANSP",  124, 64,          K_SEMI,    77},
     [P_VOLUME]      = {"VOLUME",  127, 100,         K_NUM,     7},
 
     /* CHORD CONFIG */

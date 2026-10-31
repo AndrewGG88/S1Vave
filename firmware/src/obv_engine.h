@@ -78,9 +78,7 @@ static void note_event(uint32_t on, uint32_t note, uint32_t vel) { note_event_p(
 /* Realtime Controllers */
 static volatile int32_t ctl_bend;               /* -8192..8191 */
 static volatile uint32_t ctl_sustain, ctl_hold, ctl_cc7 = 127;
-#if BOARD_SMK37
 static volatile int32_t ctl_vib;
-#endif
 static volatile int32_t ctl_tune8;              /* Master tune, Q8 */
 static volatile uint32_t ctl_tempo = 120, ctl_ext_quarter;
 static volatile uint32_t ctl_arp_restart, ctl_panic;
@@ -115,7 +113,7 @@ typedef struct {
     uint32_t chop_ovtn, chop_comb_q8;
     int32_t g_chop_masked;
     uint32_t poly_mode, porta_mode, glide_k;
-    int32_t fine_tune8, range_semi8;
+    int32_t fine_tune8, range_semi8, transp_semi8;
     /* Riser effect state */
     int32_t riser_sm, riser_reso_k, riser_shape, riser_lvl;
     uint32_t riser_mode, riser_ph;
@@ -668,6 +666,7 @@ static void block_globals(part_t *g)
 
     g->range_semi8 = (int32_t)RANGE_SEMITONES[pv[P_RANGE] % 6u] << 8;
     g->fine_tune8 = ((int32_t)pv[P_FINE_TUNE] - 64) * 48;
+    g->transp_semi8 = ((int32_t)pv[P_TRANSPOSE] - 64) << 8;
 
     g->lvl_sqr = pv[P_PULSE_LVL];
     g->lvl_saw = pv[P_SAW_LVL];
@@ -769,7 +768,7 @@ static void voice_block(voice_t *v, uint32_t card)
 
     /* Pitch calculation with analog card detuning & slow thermal drift */
     int32_t v_tune = VINT_TUNE8_WARM[card];
-    p8 = (v->pitch16 >> 8) + g->range_semi8 + g->fine_tune8 + g->bend8 + ctl_tune8
+    p8 = (v->pitch16 >> 8) + g->range_semi8 + g->fine_tune8 + g->transp_semi8 + g->bend8 + ctl_tune8
         + v->det8 + v_tune + (v->drift >> 11);
     int32_t lfo_pd = g->lfo_pd;
     if (pv[P_LFO_WAVE] == LFO_NOISE) {
@@ -777,9 +776,9 @@ static void voice_block(voice_t *v, uint32_t card)
         lfo_pd = 0;
     }
     p8 += (lfo * lfo_pd) >> 15;
-#if BOARD_SMK37
-    p8 += (lfo * ctl_vib) >> 15;
-#endif
+    if (ctl_vib) {
+        p8 += (lfo * ctl_vib) >> 14;   /* CC 1 Mod Wheel vibrato */
+    }
     v->inc = pitch_inc(p8);
 
     /* PWM / Square Wave Duty Cycle (Phase) Calculation */

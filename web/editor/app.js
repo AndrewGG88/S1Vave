@@ -111,7 +111,7 @@ const state = {
     65: 0,    // Portamento Switch (0=OFF, 1=ON)
     64: 0,    // Sustain Pedal (0=OFF, 127=HOLD)
     5: 30,    // Portamento Time
-    77: 60,   // Key Transpose (-60..+60 ST)
+    77: 64,   // Key Transpose (-60..+60 ST, Center=64)
     7: 90,    // Patch Volume
     81: 1,    // Chord Voice 2 SW (0=OFF, 1=ON)
     85: 12,   // Chord Voice 2 Shift (-12..+12 ST)
@@ -706,7 +706,7 @@ function formatSliderVal(id, val) {
   if (id === 'slTone') return (val - 64 > 0 ? '+' : '') + (val - 64);
   if (id === 'slWarmth') return `${Math.round(val * 100 / 127)}%`;
   if (id === 'slTune') return (val - 64 > 0 ? '+' : '') + (val - 64);
-  if (id === 'slTranspose') return (val - 60 > 0 ? '+' : '') + (val - 60) + ' ST';
+  if (id === 'slTranspose') return (val - 64 > 0 ? '+' : '') + (val - 64) + ' ST';
   if (id === 'slChordKs2' || id === 'slChordKs3' || id === 'slChordKs4') {
     return (val - 12 > 0 ? '+' : '') + (val - 12) + ' ST';
   }
@@ -1024,7 +1024,7 @@ const BASELINE_INIT_PATCH = {
   65: 0,    // Porta Switch OFF
   64: 0,    // Sustain Pedal OFF
   5: 30,
-  77: 60,   // Transpose 0
+  77: 64,   // Transpose 0 (Center=64)
   7: 90,
   81: 1,    // Chord V2 ON
   85: 12,   // Chord V2 Shift 0

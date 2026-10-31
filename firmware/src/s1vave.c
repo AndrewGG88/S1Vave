@@ -449,7 +449,7 @@ static void param_value(char *s, uint32_t p, uint32_t v)   /* <= 7 characters */
     case K_REVM: scat(s, REVERB_NAME[v % 7u]); break;
     case K_PMODE: scat(s, POLY_NAME[v % NPOLY_MODE]); break;
     case K_PORTAM: scat(s, PORTA_NAME[v % 3u]); break;
-    case K_SEMI: if (v < 60u) { scat(s, "-"); fmt_u(t, 60u - v); } else { scat(s, v > 60u ? "+" : ""); fmt_u(t, v - 60u); } scat(s, t); break;
+    case K_SEMI: { uint32_t cen = PDEF[p].def; if (v < cen) { scat(s, "-"); fmt_u(t, cen - v); } else { scat(s, v > cen ? "+" : ""); fmt_u(t, v - cen); } scat(s, t); break; }
     case K_MS:
         if (p == P_PORTA_TIME) { if (!v) scat(s, "OFF"); else { fmt_u(s, GLIDE_MS[v & 127u]); scat(s, "ms"); } }
         else if (p == P_ATTACK) fmt_ms(s, ATT_MS_X10[v & 127u]);
@@ -1574,7 +1574,11 @@ static void midi_in(uint32_t notes_only)
         else if (kind == 0xC0u && ed_b() && d1 < NPROG) { b_set(d1 + 1u); dirty_hdr = dirty_page = dirty_tags = 1; }
         else if (kind == 0xC0u && d1 < NPROG) { load_program(d1); dirty_hdr = dirty_page = dirty_tags = 1; set.prog = (uint8_t)prog; }
             else if (kind == 0xB0u) {
-            if (d1 == 7u) ctl_cc7 = d2;
+            if (d1 == 1u) {
+                ctl_vib = d2;
+                dirty_page = 1;
+            }
+            else if (d1 == 7u) ctl_cc7 = d2;
             else if (d1 == 64u) ctl_sustain = d2 >= 64u;
             else if (d1 == 111u) {
                 ctl_arp_on = d2 >= 64u ? 1u : 0u;
@@ -1658,6 +1662,15 @@ static void midi_in(uint32_t notes_only)
                 int32_t v = (PDEF[p].max == 127 || d2 <= PDEF[p].max) ? (int32_t)d2 : ((int32_t)d2 * PDEF[p].max + 63) / 127;
                 set_param(p, v);
                 if (p == P_CUTOFF) cut_shown_t = fm1_ms + 1u;
+                if (p == P_TRANSPOSE) {
+                    static char msg[24];
+                    msg[0] = 0; scat(msg, "TRANSP ");
+                    int32_t st = (int32_t)v - 64;
+                    if (st > 0) scat(msg, "+");
+                    fmt_s(msg + slen(msg), st);
+                    scat(msg, " st");
+                    say(msg);
+                }
                 dirty_page = dirty_hdr = 1;
                 if (p == P_POLY_MODE || p == P_CHO_MODE || p == P_DLY_LVL || p == P_REV_LVL) dirty_tags = 1;
                 midi_in_active = 0;
@@ -2021,14 +2034,28 @@ static void app_main(void)
             say(t ? (pat.trk[1].len ? (pat.trk[1].B_PROG ? "TRACK B: ITS OWN SOUND" : "TRACK B") : is_seq_page(page) ? "TRACK B OFF: " NM_K1 " = ON" : "TRACK B IS OFF: SEQ + " NM_KNOB4) : "TRACK A");
             dirty_page = dirty_steps = dirty_tags = dirty_hdr = 1;
         }
-        if ((e = fm1_enc_take(ENC_SELECT)) != 0) {   /* SELECT: the tempo, always */
-            static char msg[16];
-            set.tempo = (uint8_t)clampi(set.tempo + e, 40, 240); ctl_tempo = set.tempo;
-            pat.tempo = set.tempo;
-            set_dirty = 1; set_t = fm1_ms;
-            msg[0] = 0; scat(msg, "TEMPO "); fmt_u(msg + slen(msg), set.tempo);
-            say(msg);
-            dirty_page |= page == PG_GLOBAL;
+        if ((e = fm1_enc_take(ENC_SELECT)) != 0) {   /* SELECT: the tempo, or OCT held = Key Transpose */
+            if ((fm1_in.buttons >> BTN_OCT_DOWN & 1u) || (fm1_in.buttons >> BTN_OCT_UP & 1u)) {
+                int32_t cur = (int32_t)live.v[P_TRANSPOSE];
+                int32_t next = clampi(cur + e, 4, 124);
+                set_param(P_TRANSPOSE, next);
+                static char msg[24];
+                msg[0] = 0; scat(msg, "TRANSP ");
+                int32_t st = next - 64;
+                if (st > 0) scat(msg, "+");
+                fmt_s(msg + slen(msg), st);
+                scat(msg, " st");
+                say(msg);
+                dirty_page = 1;
+            } else {
+                static char msg[16];
+                set.tempo = (uint8_t)clampi(set.tempo + e, 40, 240); ctl_tempo = set.tempo;
+                pat.tempo = set.tempo;
+                set_dirty = 1; set_t = fm1_ms;
+                msg[0] = 0; scat(msg, "TEMPO "); fmt_u(msg + slen(msg), set.tempo);
+                say(msg);
+                dirty_page |= page == PG_GLOBAL;
+            }
         }
         for (k = 0; k < 4u; k++) {
             int32_t p = PAGE[page].p[k];
