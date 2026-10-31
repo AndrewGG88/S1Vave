@@ -1908,6 +1908,7 @@ static void app_main(void)
         static uint32_t oct_t;
         static uint8_t oct_used;
         static uint8_t oct_shown;
+        static uint32_t oct_page_back;
         if (b & (3u << BTN_OCT_DOWN)) {
             if (layer == L_EDIT) {              /* EDIT + OCT- / OCT+: undo / redo (one level: a swap) */
                 if (undo_ok) { pattern_t tmp = pat; pat = undo_pat; undo_pat = tmp; pat_edited = 1; say(b & (1u << BTN_OCT_DOWN) ? "UNDO" : "REDO"); }
@@ -1931,24 +1932,26 @@ static void app_main(void)
                 oct_t = fm1_ms;
                 oct_used = 0;
                 oct_shown = 0;
+                oct_page_back = page;
             }
             dirty_steps = dirty_page = 1;
         }
+        /* When kept pressed: switch to VOICE page to view transpose and knobs */
         if (oct_held && (fm1_in.buttons & oct_held)) {
             if (!oct_shown && fm1_ms - oct_t >= 250u) {
                 oct_shown = 1;
-                oct_used = 1;
-                int32_t st = (int32_t)live.v[P_TRANSPOSE] - 64;
-                static char msg[24];
-                msg[0] = 0; scat(msg, "TRANSP ");
-                if (st > 0) scat(msg, "+");
-                fmt_s(msg + slen(msg), st);
-                scat(msg, " st");
-                say(msg);
+                np = PG_VOICE;
                 dirty_page = 1;
+            } else if (oct_shown) {
+                np = PG_VOICE;
             }
         }
+        /* On release: return from VOICE page; if short tap, apply octave shift */
         if (rel & (3u << BTN_OCT_DOWN)) {
+            if (oct_shown) {
+                np = oct_page_back;
+                dirty_page = 1;
+            }
             if (!oct_used && oct_held) {
                 if (oct_held & (1u << BTN_OCT_DOWN)) {
                     if (set.oct > -2) {
@@ -2083,6 +2086,8 @@ static void app_main(void)
         if ((e = fm1_enc_take(ENC_ALGORITHM)) != 0) {   /* ALGORITHM: the track, or OCT held = Key Transpose */
             if ((fm1_in.buttons >> BTN_OCT_DOWN & 1u) || (fm1_in.buttons >> BTN_OCT_UP & 1u)) {
                 oct_used = 1;
+                oct_shown = 1;
+                np = PG_VOICE;
                 int32_t cur = (int32_t)live.v[P_TRANSPOSE];
                 int32_t next = clampi(cur + e, 4, 124);
                 set_param(P_TRANSPOSE, next);
@@ -2104,6 +2109,8 @@ static void app_main(void)
         if ((e = fm1_enc_take(ENC_SELECT)) != 0) {   /* SELECT: the tempo, or OCT held = Key Transpose */
             if ((fm1_in.buttons >> BTN_OCT_DOWN & 1u) || (fm1_in.buttons >> BTN_OCT_UP & 1u)) {
                 oct_used = 1;
+                oct_shown = 1;
+                np = PG_VOICE;
                 int32_t cur = (int32_t)live.v[P_TRANSPOSE];
                 int32_t next = clampi(cur + e, 4, 124);
                 set_param(P_TRANSPOSE, next);
