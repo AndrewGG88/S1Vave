@@ -80,6 +80,17 @@ static volatile int32_t ctl_bend;               /* -8192..8191 */
 static volatile uint32_t ctl_sustain, ctl_hold, ctl_cc7 = 127;
 static volatile int32_t ctl_vib;
 static volatile int32_t ctl_tune8;              /* Master tune, Q8 */
+
+/* Stereo spread & unison detune - the VIBE editor's SPREAD / DETUNE controls (fm1_extra.c).
+ * Note-on only: voice_start already carries pan and det8, the per-sample path is untouched.
+ * Without FM1_EXTRA (the FM-1 build) these are the stock Roland S-1 constants. */
+#ifdef FM1_EXTRA
+static int32_t g_spread64;               /* pan width 0..64 at note-on (SPREAD %), 0 = centered mono */
+static int32_t g_detune8;                /* extra detune Q8 (DETUNE cents) on top of the stock S-1 spread */
+#else
+#define g_spread64 0
+#define g_detune8 0
+#endif
 static volatile uint32_t ctl_tempo = 120, ctl_ext_quarter;
 static volatile uint32_t ctl_arp_restart, ctl_panic;
 static volatile uint32_t ctl_arp_on;
@@ -219,7 +230,9 @@ static void voice_trigger(uint32_t part, uint32_t note, uint32_t vel)
 
     if (mode == POLY_POLY) {
         uint32_t v = voice_alloc(part);
-        voice_start(&vc[v], part, note, vel, 0, 0, 0);
+        voice_start(&vc[v], part, note, vel,
+                        (vseq & 1) ? g_detune8 : -g_detune8,
+                        (vseq & 1) ? g_spread64 : -g_spread64, 0);
     } else if (mode == POLY_MONO) {
         voice_t *v = &vc[0];
         int legato = v->gate;
@@ -236,9 +249,11 @@ static void voice_trigger(uint32_t part, uint32_t note, uint32_t vel)
             voice_start(v, part, note, vel, 0, 0, 0);
         }
     } else if (mode == POLY_UNISON) {
-        /* 4 voices stacked with symmetric detuning, centered stereo (authentic Roland S-1) */
-        int32_t det = 22;
+        /* 4 voices stacked with symmetric detuning (stock Roland S-1: centered, detune 22 Q8) */
+        int32_t det = 22 + g_detune8;
         int32_t det_offsets[4] = {-det, -det / 3, det / 3, det};
+        int32_t sp = g_spread64;
+        int32_t pan_offsets[4] = {-sp, -sp / 3, sp / 3, sp};
         int legato = vc[0].gate;
         if (legato) {
             for (uint32_t i = 0; i < 4; i++) {
@@ -254,7 +269,7 @@ static void voice_trigger(uint32_t part, uint32_t note, uint32_t vel)
         } else {
             uint32_t base_ph = vc[0].o_sqr.ph;
             for (uint32_t i = 0; i < 4; i++) {
-                voice_start(&vc[i], part, note, vel, det_offsets[i], 0, (uint8_t)i);
+                voice_start(&vc[i], part, note, vel, det_offsets[i], pan_offsets[i], (uint8_t)i);
                 uint32_t u_ph = base_ph + i * 0x40000000u;
                 vc[i].o_sqr.ph = u_ph;
                 vc[i].o_saw.ph = u_ph;
@@ -292,12 +307,14 @@ static void voice_trigger(uint32_t part, uint32_t note, uint32_t vel)
                 }
             }
         } else {
-            voice_start(&vc[0], part, note, vel, 0, 0, 0);
+            int32_t sp = g_spread64;
+            int32_t pan_offsets[4] = {-sp, -sp / 3, sp / 3, sp};
+            voice_start(&vc[0], part, note, vel, 0, pan_offsets[0], 0);
             for (uint32_t i = 1; i < 4; i++) {
                 int active = (i == 1 && pv[P_CHORD_SW2]) || (i == 2 && pv[P_CHORD_SW3]) || (i == 3 && pv[P_CHORD_SW4]);
                 if (active) {
                     uint32_t cn = (uint32_t)clampi((int32_t)note + shifts[i], 0, 127);
-                    voice_start(&vc[i], part, cn, vel, 0, 0, (uint8_t)i);
+                    voice_start(&vc[i], part, cn, vel, 0, pan_offsets[i], (uint8_t)i);
                 } else {
                     vc[i].gate = 0;
                 }
