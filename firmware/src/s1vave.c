@@ -1904,25 +1904,73 @@ static void app_main(void)
         smk_buttons(b, &dirty_steps);           /* FADER BANK, < > */
 #endif
         ctl_click = set.click % NCLICK == CLICK_ON || (rec == REC_ON && set.click % NCLICK != CLICK_OFF);
+        static uint32_t oct_held;
+        static uint32_t oct_t;
+        static uint8_t oct_used;
+        static uint8_t oct_shown;
         if (b & (3u << BTN_OCT_DOWN)) {
             if (layer == L_EDIT) {              /* EDIT + OCT- / OCT+: undo / redo (one level: a swap) */
                 if (undo_ok) { pattern_t tmp = pat; pat = undo_pat; undo_pat = tmp; pat_edited = 1; say(b & (1u << BTN_OCT_DOWN) ? "UNDO" : "REDO"); }
                 else say("NOTHING TO UNDO");
                 layer_used = 1;
+                oct_used = 1;
             } else if (steps_on()) {            /* the SEQ layer: OCT- / OCT+ page */
                 uint32_t t = seq_trk;
                 static char msg[20];
                 layer_used = 1;
+                oct_used = 1;
                 if (b & (1u << BTN_OCT_DOWN) && seq_pg[t]) seq_pg[t]--;
                 if (b & (1u << BTN_OCT_UP) && seq_pg[t] + 1u < seq_pages(t)) seq_pg[t]++;
                 msg[0] = 0; scat(msg, "PAGE "); fmt_u(msg + slen(msg), seq_pg[t] + 1u); scat(msg, " OF "); fmt_u(msg + slen(msg), seq_pages(t));
                 say(msg);
             } else if ((fm1_in.buttons & (3u << BTN_OCT_DOWN)) == (3u << BTN_OCT_DOWN)) {   /* both: octave 0 */
                 set.oct = 0; set_dirty = 1; set_t = fm1_ms; say("OCTAVE 0");
+                oct_used = 1;
             } else {
-                if (b & (1u << BTN_OCT_DOWN) && set.oct > -2) { set.oct--; set_dirty = 1; set_t = fm1_ms; }
-                if (b & (1u << BTN_OCT_UP) && set.oct < 2) { set.oct++; set_dirty = 1; set_t = fm1_ms; }
+                oct_held = b & (3u << BTN_OCT_DOWN);
+                oct_t = fm1_ms;
+                oct_used = 0;
+                oct_shown = 0;
             }
+            dirty_steps = dirty_page = 1;
+        }
+        if (oct_held && (fm1_in.buttons & oct_held)) {
+            if (!oct_shown && fm1_ms - oct_t >= 250u) {
+                oct_shown = 1;
+                oct_used = 1;
+                int32_t st = (int32_t)live.v[P_TRANSPOSE] - 64;
+                static char msg[24];
+                msg[0] = 0; scat(msg, "TRANSP ");
+                if (st > 0) scat(msg, "+");
+                fmt_s(msg + slen(msg), st);
+                scat(msg, " st");
+                say(msg);
+                dirty_page = 1;
+            }
+        }
+        if (rel & (3u << BTN_OCT_DOWN)) {
+            if (!oct_used && oct_held) {
+                if (oct_held & (1u << BTN_OCT_DOWN)) {
+                    if (set.oct > -2) {
+                        set.oct--; set_dirty = 1; set_t = fm1_ms;
+                        static char msg[16];
+                        msg[0] = 0; scat(msg, "OCTAVE ");
+                        fmt_s(msg + slen(msg), set.oct);
+                        say(msg);
+                    }
+                } else if (oct_held & (1u << BTN_OCT_UP)) {
+                    if (set.oct < 2) {
+                        set.oct++; set_dirty = 1; set_t = fm1_ms;
+                        static char msg[16];
+                        msg[0] = 0; scat(msg, "OCTAVE ");
+                        fmt_s(msg + slen(msg), set.oct);
+                        say(msg);
+                    }
+                }
+            }
+            oct_held = 0;
+            oct_used = 0;
+            oct_shown = 0;
             dirty_steps = dirty_page = 1;
         }
         if (b & (1u << BTN_HOME)) {             /* HOME: PERFORM; while a layer is held: lock it open; locked: let it go */
@@ -2034,6 +2082,7 @@ static void app_main(void)
         }
         if ((e = fm1_enc_take(ENC_ALGORITHM)) != 0) {   /* ALGORITHM: the track, or OCT held = Key Transpose */
             if ((fm1_in.buttons >> BTN_OCT_DOWN & 1u) || (fm1_in.buttons >> BTN_OCT_UP & 1u)) {
+                oct_used = 1;
                 int32_t cur = (int32_t)live.v[P_TRANSPOSE];
                 int32_t next = clampi(cur + e, 4, 124);
                 set_param(P_TRANSPOSE, next);
@@ -2054,6 +2103,7 @@ static void app_main(void)
         }
         if ((e = fm1_enc_take(ENC_SELECT)) != 0) {   /* SELECT: the tempo, or OCT held = Key Transpose */
             if ((fm1_in.buttons >> BTN_OCT_DOWN & 1u) || (fm1_in.buttons >> BTN_OCT_UP & 1u)) {
+                oct_used = 1;
                 int32_t cur = (int32_t)live.v[P_TRANSPOSE];
                 int32_t next = clampi(cur + e, 4, 124);
                 set_param(P_TRANSPOSE, next);
