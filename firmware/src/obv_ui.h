@@ -585,7 +585,10 @@ static void splash_frame(uint32_t fade, uint32_t sub)
     const char *t1 = "8-VOICE TWEAK SYNTH";
     const char *t2 = "FOR M-VAVE FM-1";
     const char *t_by = "BY ANDREW GG";
-    const char *t_ver = "VERSION 1.1  *  OPEN SOURCE";
+#ifndef APP_VER
+#define APP_VER "1.11"
+#endif
+    const char *t_ver = "VERSION " APP_VER "  *  OPEN SOURCE";
 
     /* Strip 1: S1VAVE Logo + Subtitles + Rule (Rows 0..119) */
     cv_begin(240, 120, C_PANEL);

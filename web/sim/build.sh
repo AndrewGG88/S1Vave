@@ -24,9 +24,11 @@ if [ -z "$WASM_OPT" ]; then
     [ -n "$WASM_OPT" ] || { echo "sim: no wasm-opt (see the top of web/sim/build.sh)"; exit 1; }
 fi
 mkdir -p build/sim docs/sim
+V=$(head -n 1 VERSION 2>/dev/null | tr -d '\r\n')
+[ -n "$V" ] || V="1.11"
 nice -n 15 $ZIG cc --target=wasm32-freestanding -mcpu=generic+bulk_memory -O2 -fno-builtin -ffreestanding -nostdlib \
     -Wall -Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable \
-    -Ifirmware/src -Ifirmware/gen \
+    -Ifirmware/src -Ifirmware/gen -DAPP_VER="\"$V\"" \
     -Wl,--no-entry -Wl,--export-memory -Wl,--export-dynamic -Wl,-z,stack-size=262144 \
     -o build/sim/raw.wasm web/sim/sim.c
 nice -n 15 "$WASM_OPT" build/sim/raw.wasm --enable-bulk-memory --asyncify -O2 --strip-debug --strip-producers \
