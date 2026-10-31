@@ -1,0 +1,9 @@
+{
+  "name": "S1Vave",
+  "author": "Andrew GG",
+  "what": "An 8-voice virtual analog tweak synth inspired by the Roland S-1 and SH-101: a punchy sub-oscillator, resonant filter, ADSR envelopes, step sequencer, and hands-on live performance controls. Built on OberVave.",
+  "kind": "synth",
+  "vintage": true,
+  "site": "https://andrewgg.one/s1vave/",
+  "play": "https://andrewgg.one/s1vave/sim/"
+}
