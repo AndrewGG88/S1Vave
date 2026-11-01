@@ -12,5 +12,5 @@ jobs:
       id-token: write       # the signing certificate
       attestations: write   # the attestation
     with:
-      build: ./build.sh --release "${GITHUB_REF_NAME#v}"
+      build: sh ./build.sh --release "${GITHUB_REF_NAME#v}"
       packages: build/*.fwsc
