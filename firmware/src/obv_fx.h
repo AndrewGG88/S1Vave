@@ -387,7 +387,7 @@ static void fx_process(int32_t *out, uint32_t n)
         }
         if (ph_mix) {                       /* Viper-style: 2..8 allpass stages, dry+wet summing */
             int32_t l0 = l, r0 = r, s, lfo;
-            lfo = ((int32_t)tri_q(ph_ph) * ph_mod) >> 8;   /* the sweep: 0..+-16x Q8 */
+            lfo = ((int32_t)tri_q(ph_ph) * ph_mod) >> 5;   /* sweep +-0.5 at full mod: the notches travel */
             ph_ph += ph_inc;
             /* feedback + dry into the chain; states stay bounded */
             l = sat16(l0 + ((ph_fb * ph_fbl) >> 8));
