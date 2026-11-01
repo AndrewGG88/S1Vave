@@ -81,12 +81,14 @@ static int32_t rv_hold;
 static uint32_t rev_pre_n = 1, dly_active, rev_active;
 /* ADV FX (SEL pages): a 4-stage phaser and a selectable rate reducer / distortion slot.
  * All per-block taps; the per-sample cost is a handful of integer ops. */
-static int32_t ph_x1[4], ph_y1[4], ph_x2[4], ph_y2[4];   /* the allpass states, L and R */
+static int32_t ph_x1[8], ph_y1[8], ph_x2[8], ph_y2[8];   /* the allpass states, L and R */
 static uint32_t ph_ph, ph_inc;                            /* the phaser LFO */
-static int32_t ph_mix;                                    /* 0..256 wet */
+static int32_t ph_mix, ph_mod, ph_fb, ph_c, ph_spread;   /* Q8/Q15 taps */
+static int32_t ph_stage;                                  /* 2/4/6/8 stages */
+static int32_t ph_fbl, ph_fbr;                            /* last wet, for feedback */
 static uint32_t rr_acc, rr_inc;                           /* the rate reducer's phase accumulator */
 static int32_t rr_hold_l, rr_hold_r, rr_shift;
-static int32_t fx_drive, fx_makeup;                      /* distortion (Q8) */
+static int32_t fx_drive, fx_makeup, fx_wet;               /* distortion (Q8), shared mix */
 static uint32_t fx_is_dist, fx_amt;
 
 #if REV_DIV == 2u
@@ -142,17 +144,19 @@ static void fx_block(const patch_t *p, uint32_t quarter)
         break;
     }
 
-    /* ADV FX taps (the phaser sweep follows the LFO rate) */
+    /* ADV FX taps: the phaser (sweep follows the LFO) + the shared reducer / distortion slot */
     ph_inc = ((uint32_t)p->v[P_LFO_RATE] + 4u) * 4500u;   /* ~0.18..6.1 Hz sweep */
     ph_mix = (p->v[P_PHASER_MIX] * 256) / 100;
+    ph_mod = 128; ph_fb = 0; ph_c = 16384; ph_spread = 1500; ph_stage = 4;   /* fixed 4-stage */
     fx_is_dist = p->v[P_FX_MODE] != 0;
     {
-        int32_t ramt = p->v[P_RED_AMT], damt = p->v[P_DIST_AMT];
-        rr_inc = 65536u / (1u + (uint32_t)(ramt * 31) / 100u);   /* hold 1..32 samples */
-        rr_shift = (uint32_t)ramt / 25u;                          /* bit crush 0..4 */
-        fx_drive = 256 + damt * 16;                              /* 1x .. 7.3x */
-        fx_makeup = (int32_t)(65536u / (uint32_t)fx_drive);      /* level match */
-        fx_amt = (ramt != 0) || (damt != 0);
+        int32_t amt = p->v[P_FX_AMT];                        /* shared amount */
+        rr_inc = 65536u / (1u + (uint32_t)(amt * 31) / 100u);  /* hold 1..32 samples */
+        rr_shift = (uint32_t)amt / 25u;                        /* bit crush 0..4 */
+        fx_drive = 256 + amt * 16;                             /* 1x .. 7.3x */
+        fx_makeup = (int32_t)(65536u / (uint32_t)fx_drive);   /* level match */
+        fx_wet = (p->v[P_FX_MIX] * 256) / 100;                 /* shared dry..wet */
+        fx_amt = (amt != 0);
     }
 
     dly_mix = (p->v[P_DLY_LVL] * 200) >> 7;     /* wet up to 0.78 */
@@ -381,29 +385,42 @@ static void fx_process(int32_t *out, uint32_t n)
             r += (rv_yr * rm) >> 8;
 #endif
         }
-        if (ph_mix) {                       /* 4 first-order allpasses per channel, LFO-swept */
-            int32_t c15 = 16384 + ((tri_q(ph_ph) * 12000) >> 11);   /* 0.13..0.87: always < 1.0 */
-            int32_t l0 = l, r0 = r, s;
+        if (ph_mix) {                       /* Viper-style: 2..8 allpass stages, dry+wet summing */
+            int32_t l0 = l, r0 = r, s, lfo;
+            lfo = ((int32_t)tri_q(ph_ph) * ph_mod) >> 8;   /* the sweep: 0..+-16x Q8 */
             ph_ph += ph_inc;
-            l = sat16(l); r = sat16(r);   /* bounded states: no runaway, no int32 overflow */
-            for (s = 0; s < 4; s++) {
-                int32_t y = sat16((((c15 * (l - ph_y1[s])) >> 15) + ph_x1[s]));
+            /* feedback + dry into the chain; states stay bounded */
+            l = sat16(l0 + ((ph_fb * ph_fbl) >> 8));
+            r = sat16(r0 + ((ph_fb * ph_fbr) >> 8));
+            for (s = 0; s < 8; s++) {
+                int32_t cs, y;
+                if (s >= ph_stage) break;
+                cs = ph_c + lfo + ph_spread * ((int32_t)s - (ph_stage >> 1));
+                if (cs < 2048) cs = 2048;
+                if (cs > 30000) cs = 30000;
+                y = sat16((((cs * (l - ph_y1[s])) >> 15) + ph_x1[s]));
                 ph_x1[s] = l; ph_y1[s] = y; l = y;
-                y = sat16((((c15 * (r - ph_y2[s])) >> 15) + ph_x2[s]));
+                y = sat16((((cs * (r - ph_y2[s])) >> 15) + ph_x2[s]));
                 ph_x2[s] = r; ph_y2[s] = y; r = y;
             }
-            l = l0 + (((l - l0) * ph_mix) >> 8);
-            r = r0 + (((r - r0) * ph_mix) >> 8);
+            ph_fbl = l; ph_fbr = r;        /* the wet tail for the next sample's feedback */
+            l = l0 + (((l - l0) * ph_mix) >> 9);   /* dry + wet/2 at full mix: the notches */
+            r = r0 + (((r - r0) * ph_mix) >> 9);
         }
-        if (!fx_amt) {                      /* bypass: both effects off */
-        } else if (fx_is_dist) {            /* drive into the softclip below */
-            l = (softclip((l * fx_drive) >> 8) * fx_makeup) >> 8;
-            r = (softclip((r * fx_drive) >> 8) * fx_makeup) >> 8;
-        } else if (rr_inc < 65536u) {       /* sample & hold decimation + bit crush */
-            rr_acc += rr_inc;
-            if (rr_acc >= 65536u) { rr_acc -= 65536u; rr_hold_l = l; rr_hold_r = r; }
-            l = rr_hold_l; r = rr_hold_r;
-            if (rr_shift) { l = (l >> rr_shift) << rr_shift; r = (r >> rr_shift) << rr_shift; }
+        if (!fx_amt) {                      /* bypass: the slot is off */
+        } else {                            /* selector picks the engine; amount + mix are shared */
+            int32_t l1 = l, r1 = r;
+            if (fx_is_dist) {               /* distortion: drive into the softclip below */
+                l1 = (softclip((l * fx_drive) >> 8) * fx_makeup) >> 8;
+                r1 = (softclip((r * fx_drive) >> 8) * fx_makeup) >> 8;
+            } else if (rr_inc < 65536u) {   /* rate reducer: sample & hold + bit crush */
+                rr_acc += rr_inc;
+                if (rr_acc >= 65536u) { rr_acc -= 65536u; rr_hold_l = l; rr_hold_r = r; }
+                l1 = rr_hold_l; r1 = rr_hold_r;
+                if (rr_shift) { l1 = (l1 >> rr_shift) << rr_shift; r1 = (r1 >> rr_shift) << rr_shift; }
+            }
+            l = l + (((l1 - l) * fx_wet) >> 8);   /* the shared dry..wet */
+            r = r + (((r1 - r) * fx_wet) >> 8);
         }
         out[2u * i] = softclip(l);
         out[2u * i + 1u] = softclip(r);

@@ -8,6 +8,7 @@ Unified Build & Deploy script for S1Vave & S2Vave:
 4. Deploys all artifacts to local folders and %APPDATA%/VIBE FM/Firmware/
 """
 
+import hashlib
 import os
 import shutil
 import subprocess
@@ -36,9 +37,15 @@ def main():
     version = version_file.read_text().strip() if version_file.exists() else "1.11"
     print(f"=== S1VAVE / S2VAVE BUILD PIPELINE (Version {version}) ===")
 
-    # 2. Build hardware firmware
-    print("\n[1/4] Building hardware firmware (.fwsc)...")
-    run_wsl(f"./build.sh --release {version}", cwd="/mnt/g/S-1 M-Vave Firmware/s1vave-main")
+    # 2. Build hardware firmware (FM-1 & SMK-37)
+    print("\n[1/4] Building hardware firmware (.fwsc for FM-1 & SMK-37)...")
+    run_wsl(
+        f"BOARD=smk37 ./build.sh --release {version} && "
+        f"BOARD=smk37 MODEL=elite ./build.sh --release {version} && "
+        f"BOARD=smk37 MODEL=mke ./build.sh --release {version} && "
+        f"./build.sh --release {version}",
+        cwd="/mnt/g/S-1 M-Vave Firmware/s1vave-main"
+    )
 
     # 3. Build browser simulator WASM
     print("\n[2/4] Building simulator WebAssembly (docs/sim/s1vave.wasm)...")
@@ -51,13 +58,35 @@ def main():
     # 5. Deploy all artifacts
     print("\n[4/4] Deploying to local folders...")
 
-    # Root workspace
+    # Root workspace - FM-1
     fwsc_src = S1VAVE / "build" / f"s1vave-{version}.fwsc"
     if not fwsc_src.exists():
         fwsc_src = S1VAVE / "build" / "s1vave.fwsc"
     if fwsc_src.exists():
         shutil.copy2(fwsc_src, ROOT / "s1vave.fwsc")
         print(f"  [OK] Copied {fwsc_src.name} -> ROOT/s1vave.fwsc")
+
+    # Root workspace - SMK-37 variants
+    smk_docs = S1VAVE / "docs" / "firmware" / "smk37"
+    smk_docs.mkdir(parents=True, exist_ok=True)
+    smk_hashes = []
+    for model_suffix, out_name in [
+        ("-smk37", "s1vave-smk37.fwsc"),
+        ("-smk37-elite", "s1vave-smk37-elite.fwsc"),
+        ("-smk37-mke", "s1vave-smk37-mke.fwsc"),
+    ]:
+        smk_pkg = S1VAVE / "build" / f"s1vave-{version}{model_suffix}.fwsc"
+        if not smk_pkg.exists():
+            smk_pkg = S1VAVE / "build" / f"s1vave{model_suffix}.fwsc"
+        if smk_pkg.exists():
+            shutil.copy2(smk_pkg, ROOT / out_name)
+            shutil.copy2(smk_pkg, smk_docs / smk_pkg.name)
+            h = hashlib.sha256(smk_pkg.read_bytes()).hexdigest()
+            smk_hashes.append(f"{h}  {smk_pkg.name}")
+            print(f"  [OK] Copied {smk_pkg.name} -> ROOT/{out_name} & docs/firmware/smk37/")
+
+    if smk_hashes:
+        (smk_docs / "SHA256SUMS").write_text("\n".join(smk_hashes) + "\n", encoding="utf-8")
 
     sim_wasm = S1VAVE / "docs" / "sim" / "s1vave.wasm"
     if sim_wasm.exists():

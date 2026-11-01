@@ -2,6 +2,7 @@
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
 [![Hardware Target](https://img.shields.io/badge/Target-M--VAVE%20FM--1-orange.svg)](docs/PANEL_GUIDE.md)
+[![SMK-37 Port](https://img.shields.io/badge/Also%20Runs%20On-M--VAVE%20SMK--37-purple.svg)](SMK37.md)
 [![Sound Engine](https://img.shields.io/badge/Sound%20Engine-SH--101%20%2F%20S--1%20Parity-00b887.svg)](docs/HANDOVER.md)
 
 **S1Vave** is an open-source firmware that transforms the portable **M-VAVE FM-1** synthesizer hardware (JieLi AC791N 32-bit RISC MCU) into an 8-voice virtual analog tweak synth modeled after the classic SH-101 and S-1 architecture.
@@ -226,6 +227,7 @@ The build pipeline enforces strict JieLi AC791N hardware rules (integer-only fix
 
 ## Documentation Links
 
+- **[M-VAVE SMK-37 Hardware Guide](SMK37.md)**: Hardware controls, 16-pad sequencer, faders, wheels, and safety instructions for running S1Vave on the SMK-37 Pro, Elite, and MKE-P37 keyboards.
 - **[Technical Handover & Calibration Guide](docs/HANDOVER.md)**: Deep dive into the DSP equations, fixed-point math, acoustic calibration measurements, volume staging, and USB audio buffer watermarks.
 - **[Hardware Panel & Navigation Guide](docs/PANEL_GUIDE.md)**: Complete guide to all physical knobs, buttons, layers, and sequencer views.
 - **[MIDI CC Implementation Chart](docs/MIDI_CC.md)**: Complete reference of all supported MIDI Control Changes.

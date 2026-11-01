@@ -1028,10 +1028,10 @@ const BASELINE_INIT_PATCH = {
         41: 0,    // Spread (0 = mono)
         42: 0,    // Detune cents
         43: 0,    // Phaser mix
-        44: 0,    // (spare: phaser rate follows the LFO)
+        44: 48,   // Phaser rate
         45: 0,    // FX mode (0 = reduce, 1 = dist)
-        46: 0,    // Rate-reducer amount
-        47: 0,    // Distortion amount
+        46: 0,    // Slot amount (shared)
+        47: 50,   // Slot mix (shared)
   7: 90,
   81: 1,    // Chord V2 ON
   85: 12,   // Chord V2 Shift 0

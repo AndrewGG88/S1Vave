@@ -103,8 +103,8 @@ enum {
     P_DETUNE,           /* Stereo Detune: 0..50 cents (extra on top of the stock S-1 unison) [CC 42] */
     P_PHASER_MIX,       /* Phaser Mix: 0..100 (0 = off); sweep follows the LFO rate [CC 43] */
     P_FX_MODE,          /* FX Slot Mode: 0=Rate Reduce, 1=Distortion [CC 45] */
-    P_RED_AMT,         /* Rate-Reducer Amount: 0..100 (0 = off) [CC 46] */
-    P_DIST_AMT,        /* Distortion Amount: 0..100 (0 = off) [CC 47] */
+    P_FX_AMT,           /* Slot Amount (shared): 0..100 (0 = off) [CC 46] */
+    P_FX_MIX,           /* Slot Mix (shared): 0..100 (dry..wet) [CC 47] */
 
     NPARAM              /* 65 total parameters */
 };
@@ -241,8 +241,8 @@ static const pdef_t PDEF[NPARAM] = {
     [P_DETUNE]      = {"DETUNE",  50,  0,           K_NUM,     42},
     [P_PHASER_MIX]  = {"PHR MIX", 100, 0,           K_NUM,     43},
     [P_FX_MODE]     = {"FX MODE", 1,   0,           K_FXMODE,  45},
-    [P_RED_AMT]     = {"RED AMT", 100, 0,           K_NUM,     46},
-    [P_DIST_AMT]    = {"DIST AMT",100, 0,           K_NUM,     47},
+    [P_FX_AMT]      = {"FX AMT",  100, 0,           K_NUM,     46},
+    [P_FX_MIX]      = {"FX MIX",  100, 50,          K_NUM,     47},
 };
 
 static const char *const RANGE_NAME[6] = {"64'", "32'", "16'", "8'", "4'", "2'"};
@@ -363,7 +363,7 @@ static const page_t PAGE[NPAGE] = {
     [PG_ARP_CFG]    = {"ARP CONFIG",{-1, -1, -1, -1}},
     [PG_SEQ]        = {"SEQUENCER", {-1, -1, -1, -1}},
     [PG_ADV1]       = {"ADV MIX",   {P_SPREAD, P_DETUNE, P_PHASER_MIX, P_FX_MODE}},
-    [PG_ADV2]       = {"ADV FX",    {P_RED_AMT, P_DIST_AMT, -1, -1}},
+    [PG_ADV2]       = {"ADV FX",    {P_FX_AMT, P_FX_MIX, -1, -1}},
 };
 
 typedef struct { uint8_t v[PATCH_BYTES]; } patch_t;

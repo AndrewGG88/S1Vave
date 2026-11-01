@@ -12,5 +12,5 @@ jobs:
       id-token: write       # the signing certificate
       attestations: write   # the attestation
     with:
-      build: sh ./build.sh --release "${GITHUB_REF_NAME#v}"
+      build: BOARD=smk37 sh ./build.sh --release "${GITHUB_REF_NAME#v}" && BOARD=smk37 MODEL=elite sh ./build.sh --release "${GITHUB_REF_NAME#v}" && BOARD=smk37 MODEL=mke sh ./build.sh --release "${GITHUB_REF_NAME#v}" && sh ./build.sh --release "${GITHUB_REF_NAME#v}"
       packages: build/*.fwsc
