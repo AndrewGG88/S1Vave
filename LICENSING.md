@@ -23,7 +23,7 @@
 | Component | License | Origin / Reference |
 |:---|:---|:---|
 | **Terminus Font 8x16** (`felucca_font.h`) | SIL Open Font License 1.1 | `assets/fonts/Terminus-LICENSE.txt` |
-| **S1VAVE Visual Branding & Cyber Orb** | Creative Commons Attribution 4.0 (CC BY 4.0) | Original custom typography and 3D cyber graphic created by **Andrew GG** |
+| **Andrew GG Logo & Brand Identity** (`assets/logo.*`, `splash.png`, icons) | Proprietary / All Rights Reserved (see [TRADEMARK.md](TRADEMARK.md)) | Copyright (C) 2026 **Andrew GG**. Common-law trademark (TM). Exclusive property of Andrew GG. |
 | **Trapezoidal SVF Filter Topology** | Public Domain / Academic | Andrew Simper (Cytomic) 24 dB/oct state-variable filter model |
 | **Plate Reverb Tank** | Public Domain / Academic | Jon Dattorro (1997) figure-of-eight recirculating network |
 | **JieLi AC79 SDK Binaries** | Apache-2.0 | `uboot.boot`, `cfg_tool.bin` read from SDK during build. No proprietary SDK source code is distributed in this repository. |
