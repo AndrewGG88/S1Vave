@@ -31,7 +31,27 @@ The SMK-37 stores factory key, pad, and wheel calibration data unique to your in
 
 ## Installation
 
-Connect the SMK-37 via USB to your computer:
+### Method 1: WebMIDI Browser Flasher (Recommended)
+
+You can flash S1Vave directly from your web browser without installing Python or command-line tools:
+
+1. **Open the Flasher**: Visit [https://andrewgg.one/s1vave/](https://andrewgg.one/s1vave/) (or [https://beta.andrewgg.one/s1vave/](https://beta.andrewgg.one/s1vave/)) in **Google Chrome**, **Microsoft Edge**, **Brave**, or **Opera** (WebMIDI with SysEx support is required).
+2. **Connect your Keyboard**: Plug your SMK-37 (Pro, Elite, MKE-P37, or Starrykey) into your computer using a USB-C data cable.
+3. **Connect Device**: Select your MIDI Input and Output ports under **Step 1: Device Connection**, then click **Connect Hardware Device**.
+   - *Smart Auto-Detection*: When your SMK-37 answers the SysEx handshake, the flasher automatically unfolds the **Advanced Hardware Options** drawer and selects your keyboard model.
+4. **Target Model Verification**: If not auto-selected, click **⚙️ Advanced Hardware Options (SMK-37 / Custom)** and choose your model:
+   - `M-VAVE SMK-37 Pro / Starrykey 37` (`s1vave-1.11-smk37.fwsc`)
+   - `M-VAVE SMK-37 Elite` (`s1vave-1.11-smk37-elite.fwsc`)
+   - `M-VAVE MKE-P37` (`s1vave-1.11-smk37-mke.fwsc`)
+5. **Flash Firmware**: Click **Flash S1Vave to Device** and accept the confirmation prompt.
+   - The flasher will verify package integrity, reboot the keyboard into its OTA loader, write the firmware blocks to flash, and verify the reboot into S1Vave.
+   - ⚠️ **Critical**: Do not disconnect the USB cable or close the browser tab until progress reaches 100% and verification completes.
+
+---
+
+### Method 2: Command Line (Python CLI)
+
+If you prefer flashing locally via terminal:
 
 ```bash
 # For SMK-37 Pro (or Donner Starrykey 37 Play):
@@ -43,8 +63,6 @@ python3 tools/fm1_install.py s1vave-<version>-smk37-elite.fwsc
 # For MKE-P37:
 python3 tools/fm1_install.py s1vave-<version>-smk37-mke.fwsc
 ```
-
-You can also flash directly in the browser via Web MIDI at [https://andrewgg.one/s1vave/](https://andrewgg.one/s1vave/).
 
 - **USB Rescue Mode**: Hold **OCTAVE-** while switching the keyboard on. S1Vave boots directly into the update loader without starting the audio engine, allowing you to reinstall cleanly.
 - **Check Status**: `python3 tools/fm1_install.py --info` reports the active firmware identity and version.
