@@ -1025,6 +1025,13 @@ const BASELINE_INIT_PATCH = {
   64: 0,    // Sustain Pedal OFF
   5: 30,
   77: 64,   // Transpose 0 (Center=64)
+        41: 0,    // Spread (0 = mono)
+        42: 0,    // Detune cents
+        43: 0,    // Phaser mix
+        44: 0,    // (spare: phaser rate follows the LFO)
+        45: 0,    // FX mode (0 = reduce, 1 = dist)
+        46: 0,    // Rate-reducer amount
+        47: 0,    // Distortion amount
   7: 90,
   81: 1,    // Chord V2 ON
   85: 12,   // Chord V2 Shift 0

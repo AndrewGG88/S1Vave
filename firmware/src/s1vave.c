@@ -45,7 +45,8 @@ static struct {
 static uint32_t set_dirty, set_t;
 /* the user's programs: PS_N to a flash sector (psect_load / psect_save), all of them in RAM */
 #define PS_N 50u
-#define PS_TAG 0x50565353u                      /* "SSVP" */
+#define PS_TAG 0x51565353u                      /* "SSVQ" (65-param sector) */
+#define PS_TAG_V1 0x50565353u                   /* "SSVP": v1.1/1.11, 59 params, name at 59 */
 typedef struct { uint32_t tag; uint8_t used[PS_N], pad[2]; patch_t p[PS_N]; } psect_t;
 _Static_assert(sizeof(psect_t) <= SETTINGS_MAX, "a program sector outgrew its flash sector");
 _Static_assert(NPSECT * PS_N >= NPROG, "too few program sectors");
@@ -453,6 +454,7 @@ static void param_value(char *s, uint32_t p, uint32_t v)   /* <= 7 characters */
     case K_REVM: scat(s, REVERB_NAME[v % 7u]); break;
     case K_PMODE: scat(s, POLY_NAME[v % NPOLY_MODE]); break;
     case K_PORTAM: scat(s, PORTA_NAME[v % 3u]); break;
+    case K_FXMODE: scat(s, FXMODE_NAME[v % 2u]); break;
     case K_SEMI: { uint32_t cen = PDEF[p].def; if (v < cen) { scat(s, "-"); fmt_u(t, cen - v); } else { scat(s, v > cen ? "+" : ""); fmt_u(t, v - cen); } scat(s, t); break; }
     case K_MS:
         if (p == P_PORTA_TIME) { if (!v) scat(s, "OFF"); else { fmt_u(s, GLIDE_MS[v & 127u]); scat(s, "ms"); } }
@@ -1766,11 +1768,25 @@ static void app_main(void)
     cc_map_init();
     {
         uint32_t n;
-        for (n = 0; n < NPSECT; n++)
-            if (psect_load(n, &psect[n], sizeof psect[n]) || psect[n].tag != PS_TAG) {
+        for (n = 0; n < NPSECT; n++) {
+            int ok = !psect_load(n, &psect[n], sizeof psect[n]);
+            if (ok && psect[n].tag == PS_TAG_V1) {   /* v1.11 saves: move the name, keep the sound */
+                uint32_t i, k;
+                for (i = 0; i < PS_N; i++)
+                    if (psect[n].used[i]) {
+                        uint8_t nm[PATCH_NAME];
+                        patch_t *p = &psect[n].p[i];
+                        for (k = 0; k < PATCH_NAME; k++) nm[k] = p->v[59 + k];
+                        for (k = 59; k < 65; k++) p->v[k] = PDEF[k].def;
+                        for (k = 0; k < PATCH_NAME; k++) p->v[65 + k] = nm[k];
+                    }
+                psect[n].tag = PS_TAG;
+                ps_dirty |= 1u << n;
+            } else if (!ok || psect[n].tag != PS_TAG) {
                 memset(&psect[n], 0, sizeof psect[n]);
                 psect[n].tag = PS_TAG;
             }
+        }
         set.version = 0;
         if (settings_load(&set, sizeof set) || set.version != SET_VERSION) {
             memset(&set, 0, sizeof set);
@@ -1985,6 +2001,7 @@ static void app_main(void)
             layer = L_NONE; layer_lock = 0; b &= ~((1u << BTN_ENV) | (1u << BTN_LFO) | (1u << BTN_ARP));
             dirty_page = dirty_steps = dirty_tags = 1; leds_q = 0xFFFFFFFFu;
         }
+        if (b & (1u << BTN_SEL) && !layer) np = cycle_page(PG_ADV1, 2);   /* the free button: ADV */
         if (b & (1u << BTN_ENV)) np = cycle_page(PG_ADSR, 2);
         if (b & (1u << BTN_LFO)) np = cycle_page(PG_LFO, 3);
         if (b & (1u << BTN_ARP)) {
@@ -2299,6 +2316,7 @@ static void app_main(void)
         fm1_led_key(BTN_LFO, page == PG_LFO || page == PG_LFO_MOD || page == PG_RISER);
         fm1_led_key(BTN_FX, page == PG_FX_MIX || page == PG_DELAY || page == PG_REVERB);
         fm1_led_key(BTN_GLO, page == PG_VOICE || page == PG_GLOBAL);
+        fm1_led_key(BTN_SEL, page == PG_ADV1 || page == PG_ADV2);
         fm1_led_key(BTN_ARP, ctl_arp_on || (hold >> ed_b() & 1u) || page == PG_ARP || page == PG_ARP_CFG);
         fm1_led_key(BTN_SAVE, save_armed);
 #if BOARD_SMK37

@@ -18,6 +18,13 @@ This document lists the complete MIDI Control Change (CC) mapping for **S1Vave**
 | **65** | Portamento Switch | `0–127` | $\ge 64$ enables portamento |
 | **76** | Fine Tune | `0–127` | Master pitch fine tune ($-64 \dots +63$, center = 64) |
 | **77** | Key Transpose | `4–124` | Transpose ($-60 \dots +60$ semitones, center = 64) |
+| **41** | Stereo Spread | ``0–100`` | Stereo width of Unison/Chord voices and Poly pan (0 = mono) |
+| **42** | Stereo Detune | ``0–50`` | Extra stereo detune in cents, on top of the stock S-1 unison |
+| **43** | Phaser Mix | ``0–100`` | 4-stage phaser depth (0 = off) |
+| **44** | *(spare)* | | Phaser sweep follows the LFO rate (CC 3) |
+| **45** | FX Mode | ``0–1`` | FX slot: 0 = rate reducer, 1 = distortion |
+| **46** | Rate-Reducer Amount | ``0–100`` | Sample-rate reducer amount (0 = off) |
+| **47** | Distortion Amount | ``0–100`` | Distortion drive amount (0 = off) |
 | **80** | Polyphony Mode | `0–3` | `0 = MONO`, `1 = UNISON` (8-voice stacked), `2 = POLY` (8-voice dynamic), `3 = CHORD` |
 | **120** | All Sound Off | `0` | Immediately mutes all voices |
 | **123** | All Notes Off | `0` | Releases all held notes |

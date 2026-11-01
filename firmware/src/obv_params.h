@@ -98,7 +98,15 @@ enum {
     P_CHORD_KS3,        /* Chord Voice 3 Shift: 0..24 (-12..+12) [CC 86] */
     P_CHORD_KS4,        /* Chord Voice 4 Shift: 0..24 (-12..+12) [CC 87] */
 
-    NPARAM              /* 59 total parameters */
+    /* 59..64: ADV - stereo, phaser & the lo-fi/distortion slot (SEL button pages) */
+    P_SPREAD,           /* Stereo Spread: 0..100 (0 = mono) [CC 41] */
+    P_DETUNE,           /* Stereo Detune: 0..50 cents (extra on top of the stock S-1 unison) [CC 42] */
+    P_PHASER_MIX,       /* Phaser Mix: 0..100 (0 = off); sweep follows the LFO rate [CC 43] */
+    P_FX_MODE,          /* FX Slot Mode: 0=Rate Reduce, 1=Distortion [CC 45] */
+    P_RED_AMT,         /* Rate-Reducer Amount: 0..100 (0 = off) [CC 46] */
+    P_DIST_AMT,        /* Distortion Amount: 0..100 (0 = off) [CC 47] */
+
+    NPARAM              /* 65 total parameters */
 };
 
 #define PATCH_NAME 10u
@@ -115,7 +123,8 @@ enum {
     K_NUM, K_BIP, K_ONOFF, K_RANGE, K_SUBTYPE, K_NOISEM, K_PWMS,
     K_DRAWSW, K_MULT, K_OVTN, K_COMB, K_ENVTRG, K_AMP, K_LFOWAVE,
     K_RISERM, K_CHOM, K_REVM, K_PMODE, K_PORTAM, K_CUT, K_MS, K_HZ, K_PCT, K_SEMI,
-    K_DDIV, K_FLTCOL
+    K_DDIV, K_FLTCOL,
+    K_FXMODE
 };
 
 /* Named constants for parameters */
@@ -226,6 +235,14 @@ static const pdef_t PDEF[NPARAM] = {
     [P_CHORD_KS2]   = {"V2 SHIFT",24,  12,          K_SEMI,    85},
     [P_CHORD_KS3]   = {"V3 SHIFT",24,  12,          K_SEMI,    86},
     [P_CHORD_KS4]   = {"V4 SHIFT",24,  12,          K_SEMI,    87},
+
+    /* ADV: stereo, phaser & the lo-fi/distortion slot (defaults = 0: stock S-1 behaviour) */
+    [P_SPREAD]      = {"SPREAD",  100, 0,           K_NUM,     41},
+    [P_DETUNE]      = {"DETUNE",  50,  0,           K_NUM,     42},
+    [P_PHASER_MIX]  = {"PHR MIX", 100, 0,           K_NUM,     43},
+    [P_FX_MODE]     = {"FX MODE", 1,   0,           K_FXMODE,  45},
+    [P_RED_AMT]     = {"RED AMT", 100, 0,           K_NUM,     46},
+    [P_DIST_AMT]    = {"DIST AMT",100, 0,           K_NUM,     47},
 };
 
 static const char *const RANGE_NAME[6] = {"64'", "32'", "16'", "8'", "4'", "2'"};
@@ -242,6 +259,7 @@ static const char *const REVERB_NAME[7] = {"AMB", "ROOM", "HALL 1", "HALL 2", "P
 static const char *const POLY_NAME[NPOLY_MODE] = {"MONO", "UNISON", "POLY", "CHORD"};
 static const char *const PORTA_NAME[3] = {"OFF", "ON", "AUTO"};
 static const char *const FLTCOL_NAME[2] = {"S-1", "WARM"};
+static const char *const FXMODE_NAME[2] = {"REDUCE", "DIST"};
 
 /* Roland S-1 LFO Tempo Sync 31 Note Divisions */
 static const char *const LFO_SYNC_NAME[31] = {
@@ -316,6 +334,10 @@ enum {
     PG_ARP,         /* Arpeggiator Page: Mode, Hold, Type, Rate */
     PG_ARP_CFG,     /* Arpeggiator Config: Note Priority */
     PG_SEQ,         /* Sequencer view (drawn by hand) */
+
+    /* SEL Button Pages (1..2): the advanced controls */
+    PG_ADV1,        /* Spread, Detune, Phaser Mix, FX Mode */
+    PG_ADV2,        /* Rate-Reducer Amount, Distortion Amount, -1, -1 */
     NPAGE
 };
 
@@ -340,6 +362,8 @@ static const page_t PAGE[NPAGE] = {
     [PG_ARP]        = {"ARPEGGIO",  {-1, -1, -1, -1}},
     [PG_ARP_CFG]    = {"ARP CONFIG",{-1, -1, -1, -1}},
     [PG_SEQ]        = {"SEQUENCER", {-1, -1, -1, -1}},
+    [PG_ADV1]       = {"ADV MIX",   {P_SPREAD, P_DETUNE, P_PHASER_MIX, P_FX_MODE}},
+    [PG_ADV2]       = {"ADV FX",    {P_RED_AMT, P_DIST_AMT, -1, -1}},
 };
 
 typedef struct { uint8_t v[PATCH_BYTES]; } patch_t;
