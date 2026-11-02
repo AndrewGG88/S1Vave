@@ -1,5 +1,5 @@
 {
-  "what": "An 8-voice virtual analog tweak synth inspired by the Roland S-1 and SH-101: a punchy sub-oscillator, resonant filter, ADSR envelopes, step sequencer, and hands-on live performance controls.",
+  "what": "An 8-voice virtual analog tweak synth: authentic 4-pole resonant filter, dual sub-oscillator, ADSR envelopes, 64-step sequencer, and hands-on live performance controls.",
   "author": "Andrew GG",
   "kinds": ["synth"],
   "play": "https://andrewgg.one/s1vave/sim/",

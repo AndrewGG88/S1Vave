@@ -16,7 +16,7 @@ import sys
 import zipfile
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent if (Path(__file__).resolve().parent / "s1vave-main").exists() else Path(__file__).resolve().parent.parent
 S1VAVE = ROOT / "s1vave-main"
 S2VAVE = ROOT / "s2vave"
 VIBE_SDK = ROOT / "vibe-fm-sdk-main"
@@ -52,19 +52,28 @@ def main():
     run_wsl("sh web/sim/build.sh", cwd="/mnt/g/S-1 M-Vave Firmware/s1vave-main")
 
     # 4. Build VIBE VST targets
-    print("\n[3/4] Building VIBE VST WASM packages (s1vave & s2vave)...")
-    run_wsl("sh firmware/s1vave/build.sh && sh firmware/s2vave/build.sh", cwd="/mnt/g/S-1 M-Vave Firmware/vibe-fm-sdk-main")
+    print("\n[3/4] Building VIBE VST WASM packages (s1vave & s2vave, native)...")
+    run_wsl(
+        'export ZIG="/home/andrewgg/.local/lib/python3.10/site-packages/ziglang/zig" && '
+        'sh tools/build.sh firmwares/s1vave && '
+        'sh tools/build.sh firmwares/s2vave',
+        cwd="/mnt/g/S-1 M-Vave Firmware/vibe-fm-sdk-main"
+    )
 
     # 5. Deploy all artifacts
     print("\n[4/4] Deploying to local folders...")
 
     # Root workspace - FM-1
+    fw_docs = S1VAVE / "docs" / "firmware"
+    fw_docs.mkdir(parents=True, exist_ok=True)
     fwsc_src = S1VAVE / "build" / f"s1vave-{version}.fwsc"
     if not fwsc_src.exists():
         fwsc_src = S1VAVE / "build" / "s1vave.fwsc"
     if fwsc_src.exists():
         shutil.copy2(fwsc_src, ROOT / "s1vave.fwsc")
-        print(f"  [OK] Copied {fwsc_src.name} -> ROOT/s1vave.fwsc")
+        shutil.copy2(fwsc_src, fw_docs / f"s1vave-{version}.fwsc")
+        shutil.copy2(fwsc_src, fw_docs / "s1vave.fwsc")
+        print(f"  [OK] Copied {fwsc_src.name} -> ROOT/s1vave.fwsc & docs/firmware/")
 
     # Root workspace - SMK-37 variants
     smk_docs = S1VAVE / "docs" / "firmware" / "smk37"
@@ -98,10 +107,15 @@ def main():
     s2_vst_wasm = VIBE_SDK / "build" / "s2vave.wasm"
     s2_vst_zip = VIBE_SDK / "build" / "s2vave.zip"
 
+    vibe_docs = S1VAVE / "docs" / "firmware" / "vibe"
+    vibe_docs.mkdir(parents=True, exist_ok=True)
+
     if s1_vst_wasm.exists():
         shutil.copy2(s1_vst_wasm, ROOT / "s1vave.wasm")
         shutil.copy2(s1_vst_zip, ROOT / "s1vave-vibe.zip")
-        print("  [OK] Copied s1vave VST wasm & zip -> ROOT")
+        shutil.copy2(s1_vst_wasm, vibe_docs / "s1vave.wasm")
+        shutil.copy2(s1_vst_zip, vibe_docs / "s1vave.zip")
+        print("  [OK] Copied s1vave VST wasm & zip -> ROOT & docs/firmware/vibe/")
 
     if s2_vst_wasm.exists():
         shutil.copy2(s2_vst_wasm, ROOT / "s2vave.wasm")

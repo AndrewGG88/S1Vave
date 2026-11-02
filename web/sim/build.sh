@@ -34,9 +34,13 @@ nice -n 15 $ZIG cc --target=wasm32-freestanding -mcpu=generic+bulk_memory -O2 -f
 nice -n 15 "$WASM_OPT" build/sim/raw.wasm --enable-bulk-memory --asyncify -O2 --strip-debug --strip-producers \
     -o docs/sim/s1vave.wasm
 cp web/sim/index.html web/sim/sim.js web/sim/sim.css web/sim/worklet.js docs/sim/
+if [ -f assets/logo-transparent.png ]; then
 python3 - <<'PY' || cp assets/logo-transparent.png docs/sim/logo.png
 from PIL import Image                           # the logo at page size (the 1600 px original is 290 KB)
 im = Image.open("assets/logo-transparent.png")
 im.resize((640, im.height * 640 // im.width), Image.LANCZOS).save("docs/sim/logo.png", optimize=True)
 PY
+else
+echo "sim: no assets/logo-transparent.png - skipping the page logo"
+fi
 echo "sim: docs/sim ($(wc -c < docs/sim/s1vave.wasm | tr -d ' ') B wasm)"
