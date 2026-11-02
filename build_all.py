@@ -54,7 +54,7 @@ def main():
     # 4. Build VIBE VST targets
     print("\n[3/4] Building VIBE VST WASM packages (s1vave & s2vave, native)...")
     run_wsl(
-        'export ZIG="/home/andrewgg/.local/lib/python3.10/site-packages/ziglang/zig" && '
+        'export ZIG="/home/andrewgg/.local/opt/zig-linux-x86_64-0.13.0/zig" && '
         'sh tools/build.sh firmwares/s1vave && '
         'sh tools/build.sh firmwares/s2vave',
         cwd="/mnt/g/S-1 M-Vave Firmware/vibe-fm-sdk-main"
