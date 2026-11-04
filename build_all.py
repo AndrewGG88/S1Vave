@@ -21,6 +21,7 @@ S1VAVE = ROOT / "s1vave-main"
 S2VAVE = ROOT / "s2vave"
 VIBE_SDK = ROOT / "vibe-fm-sdk-main"
 APPDATA_VIBE = Path(os.environ.get("APPDATA", "")) / "VIBE FM" / "Firmware"
+PROGRAMDATA_VIBE = Path(os.environ.get("ProgramData", "C:/ProgramData")) / "VIBE FM" / "Firmware"
 
 def run_wsl(cmd, cwd=None):
     c = f"cd '{cwd}' && {cmd}" if cwd else cmd
@@ -122,20 +123,21 @@ def main():
         shutil.copy2(s2_vst_zip, ROOT / "s2vave.zip")
         print("  [OK] Copied s2vave VST wasm & zip -> ROOT")
 
-    # VST folder in APPDATA
-    if APPDATA_VIBE.exists():
-        for fw in ["s1vave", "s2vave"]:
-            for ext in [".wasm", ".json", ".zip"]:
-                p = VIBE_SDK / "build" / f"{fw}{ext}"
-                if p.exists():
-                    shutil.copy2(p, APPDATA_VIBE / f"{fw}{ext}")
-            ed_src = VIBE_SDK / "build" / f"{fw}.editor"
-            ed_dst = APPDATA_VIBE / f"{fw}.editor"
-            if ed_src.exists():
-                if ed_dst.exists():
-                    shutil.rmtree(ed_dst)
-                shutil.copytree(ed_src, ed_dst)
-        print(f"  [OK] Deployed s1vave & s2vave -> {APPDATA_VIBE}")
+    # VST folder in APPDATA and ProgramData
+    for target_dir in [APPDATA_VIBE, PROGRAMDATA_VIBE]:
+        if target_dir.exists():
+            for fw in ["s1vave", "s2vave"]:
+                for ext in [".wasm", ".json", ".zip", ".png"]:
+                    p = VIBE_SDK / "build" / f"{fw}{ext}"
+                    if p.exists():
+                        shutil.copy2(p, target_dir / f"{fw}{ext}")
+                ed_src = VIBE_SDK / "build" / f"{fw}.editor"
+                ed_dst = target_dir / f"{fw}.editor"
+                if ed_src.exists():
+                    if ed_dst.exists():
+                        shutil.rmtree(ed_dst)
+                    shutil.copytree(ed_src, ed_dst)
+            print(f"  [OK] Deployed s1vave & s2vave -> {target_dir}")
 
     # Web zip bundles
     sim_dir = S1VAVE / "docs" / "sim"

@@ -40,7 +40,7 @@ int main(void)
     check("no protected sector passes the app's allow-list (erase, page)", leak_app == 0);
     check("no protected sector passes the loader's allow-list", leak_ldr == 0);
     check("the RAM driver's own net (FL_PROTECTED) covers every protected sector", leak_guard == 0);
-    check("the app may write 15 sectors: settings, 8 patterns, the owner tag, 5 of OTA staging", allowed == 15u);
+    check("the app may write 17 sectors: settings, 8 patterns, 2 user programs, the owner tag, 5 of OTA staging", allowed == 17u);
     check("straddling ranges refused: 0xBF000+0x2000, 0x9C000+0x2000, 0xA5000+0x2000, 0x3000+0x2000",
           !FL_GUARD(0xBF000u, 0x2000u) && !FL_GUARD(0x9C000u, 0x2000u) && !FL_GUARD(0xA5000u, 0x2000u) &&
           !LDR_RANGE_OK(0xBF000u, 0x2000u) && !LDR_RANGE_OK(0x3000u, 0x2000u) && FL_PROTECTED(0xBF000u, 0x2000u));
@@ -68,7 +68,8 @@ int main(void)
           LDR_RANGE_OK(0x4000u, 0x1000u) && LDR_RANGE_OK(0x9C000u, 0x1000u) && LDR_RANGE_OK(0xBF000u, 0x1000u) &&
           !LDR_RANGE_OK(0xC0000u, 0x1000u) && FL_REC_HI == 0xC0000u);
     check("FL_PLAIN_LO = the VM start 0x9D000", FL_PLAIN_LO == 0x9D000u);
-    check("FL_JEDEC_OK: the SMK part 0xEB6014 and 0x856014 only", FL_JEDEC_OK(0xEB6014u) && FL_JEDEC_OK(0x856014u) &&
+    check("FL_JEDEC_OK: the SMK part 0xEB6014, Puya 0x856014, and UC25HQ80 0xB36014",
+          FL_JEDEC_OK(0xEB6014u) && FL_JEDEC_OK(0x856014u) && FL_JEDEC_OK(0xB36014u) &&
           !FL_JEDEC_OK(0u) && !FL_JEDEC_OK(0xFFFFFFu) && !FL_JEDEC_OK(0xEB6015u));
     smk_owner_tag(tag);
     check("owner tag: \"SMK37DATA\" + the family, 16 bytes (" OBV_DATA_FAMILY ")",

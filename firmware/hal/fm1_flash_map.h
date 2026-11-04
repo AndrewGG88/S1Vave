@@ -11,13 +11,12 @@
 #define FL_IN(off, n, lo, hi) ((uint32_t)(off) >= (lo) && (uint32_t)(off) <= (hi) && \
                                (uint32_t)(n) <= (hi) - (uint32_t)(off))
 /* The flash chip the app's storage and the update loader accept (JEDEC id from 0x9F). One place
- * for the app (platform.c, recovery.c) and the loader (loader.c); extend it here for another part. */
+ * for the app (platform.c, recovery.c) and the loader (loader.c); extend it here for another part.
+ * Puya P25Q80H: 0x856014. SMK-37 Pro: 0xEB6014. UltraCrypto UC25HQ80: 0xB36014. */
 #if BOARD_SMK37
-/* SMK-37 Pro: 0xEB6014, 1 MiB, read from a unit over mask-ROM UBOOT (2026-10-09; jl-uboot-tool "Online device:
- * ID: 0xeb6014"). The driver uses only generic SPI NOR commands (9F, 05/35, 06, 20, 02, 0B). */
-#define FL_JEDEC_OK(id) ((id) == 0xEB6014u || (id) == 0x856014u)
+#define FL_JEDEC_OK(id) ((id) == 0xEB6014u || (id) == 0x856014u || (id) == 0xB36014u)
 #else
-#define FL_JEDEC_OK(id) ((id) == 0x856014u)
+#define FL_JEDEC_OK(id) ((id) == 0x856014u || (id) == 0xB36014u)
 #endif
 
 #if BOARD_SMK37
