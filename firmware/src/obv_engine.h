@@ -840,6 +840,14 @@ static void voice_block(voice_t *v, uint32_t card)
     ui_vnote[card] = v->note;
 }
 
+/* Program change smooth de-click ramp: 5.3ms fade-out -> swap patch at zero -> 5.3ms fade-in */
+static volatile int32_t patch_fade_q15 = 32768;
+static volatile int32_t patch_fade_step = 0;
+static volatile uint32_t patch_pending = 0xFFFFFFFFu;
+static volatile uint8_t patch_pending_valid = 0;
+static int32_t blk_fade_f0 = 32768, blk_fade_df = 0;
+static void apply_program(uint32_t n);
+
 /* Render audio samples of one voice */
 static void voice_render(voice_t *v, int32_t *out)
 {
@@ -938,6 +946,12 @@ static void voice_render(voice_t *v, int32_t *out)
 
         /* 8. Amplifier Envelope and Panning */
         amp = amp0 + ((da * (int32_t)i) >> 4);
+        if (blk_fade_f0 < 32768 || blk_fade_df != 0) {
+            int32_t f = blk_fade_f0 + ((blk_fade_df * (int32_t)i) >> 4);
+            if (f < 0) f = 0;
+            if (f > 32768) f = 32768;
+            amp = (int32_t)(((int64_t)amp * f) >> 15);
+        }
         y = (y * amp) >> 16;
         out[2u * i]      += (y * gl) >> 12;
         out[2u * i + 1u] += (y * gr) >> 12;
@@ -979,6 +993,42 @@ static void engine_audio(int32_t *out, uint32_t n)
         if (b_own) lfo_tick(&pt[1]);
         block_globals(&pt[0]);
         if (b_own) block_globals(&pt[1]);
+
+        /* Update program change fade ramp */
+        int32_t f0 = patch_fade_q15;
+        if (patch_fade_step < 0) {
+            patch_fade_q15 += patch_fade_step;
+            if (patch_fade_q15 <= 0) {
+                patch_fade_q15 = 0;
+                f0 = 0;
+                if (patch_pending_valid) {
+                    apply_program(patch_pending);
+                    patch_pending_valid = 0;
+                    for (uint32_t v_idx = 0; v_idx < NV; v_idx++) {
+                        if (vc[v_idx].gate) {
+                            vc[v_idx].ae.stage = E_ATT;
+                            vc[v_idx].fe.stage = E_ATT;
+                            vc[v_idx].ae.level = 0;
+                            vc[v_idx].fe.level = 0;
+                            vc[v_idx].amp0 = 0;
+                            vc[v_idx].amp1 = 0;
+                        } else {
+                            vc[v_idx].ae.stage = E_IDLE;
+                            vc[v_idx].amp0 = vc[v_idx].amp1 = 0;
+                        }
+                    }
+                }
+                patch_fade_step = 2048; /* Fade back up over 16 blocks (5.3ms) */
+            }
+        } else if (patch_fade_step > 0) {
+            patch_fade_q15 += patch_fade_step;
+            if (patch_fade_q15 >= 32768) {
+                patch_fade_q15 = 32768;
+                patch_fade_step = 0;
+            }
+        }
+        blk_fade_f0 = f0;
+        blk_fade_df = patch_fade_q15 - f0;
 
         for (v = 0; v < NV; v++) {
             if (vc[v].ae.stage == E_IDLE && !vc[v].gate) {

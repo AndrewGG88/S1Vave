@@ -160,7 +160,7 @@ static void prog_put(uint32_t n, const patch_t *p)   /* program n is the user's 
     set_t = fm1_ms;
 }
 
-static void load_program(uint32_t n)
+static void apply_program(uint32_t n)
 {
     patch_t p;
     n %= NPROG;
@@ -175,6 +175,22 @@ static void load_program(uint32_t n)
         uint32_t t = FACT_TEMPO[n];
         if (t >= 40u && t <= 240u) { set.tempo = (uint8_t)t; ctl_tempo = t; }
     }
+}
+
+static void load_program(uint32_t n)
+{
+    n %= NPROG;
+    prog = n;
+    if (engine_quiet()) {
+        apply_program(n);
+        patch_fade_q15 = 32768;
+        patch_fade_step = 0;
+        patch_pending_valid = 0;
+        return;
+    }
+    patch_pending = n;
+    patch_pending_valid = 1;
+    patch_fade_step = -2048;
 }
 
 /* two sounds: track B plays sound A, or its own program (the pattern keeps which). With track B chosen (ALGORITHM)
