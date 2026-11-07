@@ -183,10 +183,11 @@ static void voice_start(voice_t *v, uint32_t part, uint32_t note, uint32_t vel, 
     v->ae.stage = E_ATT;
     v->lfo_blk = 0;
     v->lfo_fade = 32767;
-    /* Free-running phase jitter on note strike to eliminate phase-cancellation */
-    v->o_sqr.ph += (xorshift(&v->noise) & 0x1FFFFFFFu);
-    v->o_saw.ph += (xorshift(&v->noise) & 0x1FFFFFFFu);
-    v->o_sub.ph += (xorshift(&v->noise) & 0x0FFFFFFFu);
+    /* Free-running voice phase jitter while keeping saw, pulse, and sub strictly phase-locked */
+    uint32_t jitter = xorshift(&v->noise) & 0x1FFFFFFFu;
+    v->o_sqr.ph += jitter;
+    v->o_saw.ph = v->o_sqr.ph;
+    v->o_sub.ph = (pv[P_SUB_TYPE] % 3u == SUB_1OC) ? (v->o_sqr.ph >> 1) : (v->o_sqr.ph >> 2);
     if (pv[P_RESO] > 110) {
         v->f2.ic1 += (int32_t)pv[P_RESO] * 64;
     }
@@ -618,8 +619,8 @@ static int32_t lfo_shape(const part_t *g, uint32_t ph, uint32_t shape)
         int32_t p = (int32_t)((ph + 0x40000000u) >> 15);
         return p < 65536 ? p - 32768 : 98303 - p;
     }
-    case LFO_SAW:     return 32767 - (int32_t)(ph >> 16);
-    case LFO_INV_SAW: return (int32_t)(ph >> 16) - 32768;
+    case LFO_SAW:     return (int32_t)(ph >> 16) - 32768;
+    case LFO_INV_SAW: return 32767 - (int32_t)(ph >> 16);
     case LFO_SQR:     return ph < 0x80000000u ? 32767 : -32767;
     case LFO_RND:     return (int32_t)(g->lfo_rnd_b >> 16) - 32768;
     default:          /* LFO_NOISE: static high-speed continuous noise generator matching Roland S-1 */
@@ -682,7 +683,7 @@ static void block_globals(part_t *g)
     g->lvl_sqr = pv[P_PULSE_LVL];
     g->lvl_saw = pv[P_SAW_LVL];
     g->lvl_sub = ((uint32_t)pv[P_SUB_LVL] * 7u) >> 2; /* 1.75x low-end punch */
-    g->lvl_noi = (uint32_t)pv[P_NOISE_LVL] * 2u;      /* 2.0x noise presence */
+    g->lvl_noi = (uint32_t)pv[P_NOISE_LVL] * 4u;      /* 4.0x noise presence (+6 dB boost to match Roland S-1) */
 
     g->sub_type = pv[P_SUB_TYPE] % 3u;
     g->noise_mode = pv[P_NOISE_MODE] % 2u;
