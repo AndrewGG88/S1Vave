@@ -683,7 +683,7 @@ static void block_globals(part_t *g)
     g->lvl_sqr = pv[P_PULSE_LVL];
     g->lvl_saw = pv[P_SAW_LVL];
     g->lvl_sub = ((uint32_t)pv[P_SUB_LVL] * 7u) >> 2; /* 1.75x low-end punch */
-    g->lvl_noi = (uint32_t)pv[P_NOISE_LVL] * 4u;      /* 4.0x noise presence (+6 dB boost to match Roland S-1) */
+    g->lvl_noi = (uint32_t)pv[P_NOISE_LVL] * 6u;      /* 6.0x noise presence (+3.5 dB boost to match Roland S-1) */
 
     g->sub_type = pv[P_SUB_TYPE] % 3u;
     g->noise_mode = pv[P_NOISE_MODE] % 2u;
@@ -698,8 +698,15 @@ static void block_globals(part_t *g)
     g->chop_comb_q8 = ((uint32_t)pv[P_CHOP_COMB] + 1u) << 8;
     g->g_chop_masked = chop_calc_masked_gain(g->chop_ovtn);
 
-    /* Soft compression on env amt at high values (S-1 has gentler sweep at top) */
+    /* When filter cutoff is in the bottom 25% range (cut_val < 32), the filter attenuates
+     * the effective envelope depth (scaling from 75 at cut_val=0 to simulate Roland S-1 closed filter behavior).
+     * Above 25% (cut_val >= 32), envelope amount is completely unreduced, matching the original curve. */
     int32_t fa = (int32_t)pv[P_FENV_AMT];
+    uint32_t cut_val = pv[P_CUTOFF] & 127u;
+    if (cut_val < 32u) {
+        int32_t scale = 75 + (int32_t)((52u * cut_val) >> 5);
+        fa = (fa * scale) / 127;
+    }
     if (fa > 80) fa = 80 + ((fa - 80) * 6) / 8;
     g->fenv_amt = fa;
     /* Key tracking: scaled to Q8 semitones (127 -> 256 = 100% 1V/oct chromatic follow) */
