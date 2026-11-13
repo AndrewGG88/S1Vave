@@ -1818,37 +1818,42 @@ static void app_sysex(uint32_t cmd, const uint8_t *body, uint32_t len)
         ota_send_msg(0x21u, pkt, sizeof pkt);
 #endif
     } else if (cmd == 0x21u && len >= 82u) {
-        uint32_t s = body[0] == 0x7Fu ? prog : body[0], i;
+        int is_live = (body[0] == 0x7Fu);
+        uint32_t s = is_live ? prog : body[0], i;
         uint8_t flags = body[1];
         patch_t p, fp;
         if (s >= NPROG) return;
         memcpy(&p, body + 2, sizeof(patch_t));
         for (i = 0; i < NPARAM; i++)
             if (p.v[i] > PDEF[i].max) p.v[i] = PDEF[i].max;
-        patch_from_factory(&fp, s < NFACT ? &FACTORY[s] : &FACT_INIT);
-        if ((flags & 1u) && !(s >= NFACT && memcmp(p.v, fp.v, NPARAM) == 0)) {
-            prog_put(s, &p);
-        } else {
-            psect[s / PS_N].used[s % PS_N] = 0;
+        if (!is_live) {
+            patch_from_factory(&fp, s < NFACT ? &FACTORY[s] : &FACT_INIT);
+            if ((flags & 1u) && !(s >= NFACT && memcmp(p.v, fp.v, NPARAM) == 0)) {
+                prog_put(s, &p);
+            } else {
+                psect[s / PS_N].used[s % PS_N] = 0;
+            }
+            if (!ctl_seq_run) {
+                psect_save(s / PS_N, &psect[s / PS_N], sizeof psect[0]);
+                ps_dirty &= ~(1u << (s / PS_N));
+            }
         }
-        if (!ctl_seq_run) {
-            psect_save(s / PS_N, &psect[s / PS_N], sizeof psect[0]);
-            ps_dirty &= ~(1u << (s / PS_N));
-        }
-        if (body[0] == 0x7Fu || s == prog || (flags & 4u)) {
+        if (is_live || s == prog || (flags & 4u)) {
             prog = s;
-            set.prog = (uint8_t)s;
+            if (!is_live) {
+                set.prog = (uint8_t)s;
+                set_dirty = 1;
+                set_t = fm1_ms;
+            }
             live = p;
-            edited = 0;
-            set_dirty = 1;
-            set_t = fm1_ms;
+            edited = is_live ? 1 : 0;
             if (len >= 122u) {
                 memcpy(pat.draw_table, body + 82, 32);
                 memcpy(pat.chop_mask, body + 114, 8);
                 dirty_scope = 1;
             }
         }
-        say("SYX SAVED");
+        say(is_live ? "SYX LIVE" : "SYX SAVED");
         dirty_hdr = dirty_page = dirty_tags = 1;
 #ifndef OBV_HOST
         {
@@ -2071,10 +2076,17 @@ static void app_main(void)
                                 prog = n; set.prog = (uint8_t)n; edited = 0; set_dirty = 1;
                                 if (pat.trk[1].B_PROG == n + 1u && !edited_b) live_b = live;
                             }
+                            {
+                                uint32_t si;
+                                for (si = 0; si < NPSECT; si++)
+                                    if (ps_dirty >> si & 1u) psect_save(si, &psect[si], sizeof psect[si]);
+                                ps_dirty = 0;
+                                if (set_dirty) { settings_save(&set, sizeof set); set_dirty = 0; }
+                            }
                             save_armed = 0;
                             say("SAVED");
                             dirty_hdr = dirty_tags = 1;
-                        } else { save_armed = 1; save_t = fm1_ms; save_to = ed_prog() < 32u ? 32u : ed_prog(); dirty_hdr = 1; }
+                        } else { save_armed = 1; save_t = fm1_ms; save_to = ed_prog(); dirty_hdr = 1; }
                     }
                     layer = L_NONE;
                     memset(erase_on, 0, sizeof erase_on);

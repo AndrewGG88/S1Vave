@@ -641,7 +641,7 @@ static void splash_frame(uint32_t fade, uint32_t sub)
     const char *t2 = "FOR M-VAVE FM-1";
     const char *t_by = "BY ANDREW GG";
 #ifndef APP_VER
-#define APP_VER "2.0"
+#define APP_VER "2.0.1"
 #endif
     const char *t_ver = "VERSION " APP_VER "  *  OPEN SOURCE";
 
