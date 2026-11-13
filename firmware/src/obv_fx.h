@@ -75,26 +75,16 @@ static uint32_t cho_ph, cho_inc, rv_ph1, rv_ph2, rv_ph_inc1 = 97391u * REV_DIV, 
 static int32_t cho_depth_k, cho_mix, dly_mix, rev_mix, dly_fb, dly_tone_k, rev_decay, rev_damp_k, rev_bw = 16700, rev_mod_scale = 256;
 static int32_t dly_time, dly_cur;               /* Q16 samples: the target and where the read is (it slews like a tape) */
 static int32_t dly_lpl, dly_lpr, rv_hp_in, rv_lp_in, rv_lpl, rv_lpr, rv_yl, rv_yr;
-#if REV_DIV == 2u
 static int32_t rv_hold;
-#endif
 static uint32_t rev_pre_n = 1, dly_active, rev_active;
-/* ADV FX (SEL pages): a 4-stage phaser and a selectable rate reducer / distortion slot.
- * All per-block taps; the per-sample cost is a handful of integer ops. */
-static int32_t ph_x1[8], ph_y1[8], ph_x2[8], ph_y2[8];   /* the allpass states, L and R */
-static uint32_t ph_ph, ph_inc;                            /* the phaser LFO */
-static int32_t ph_mix, ph_mod, ph_fb, ph_c, ph_spread;   /* Q8/Q15 taps */
-static int32_t ph_stage;                                  /* 2/4/6/8 stages */
-static int32_t ph_fbl, ph_fbr;                            /* last wet, for feedback */
+static volatile uint32_t ctl_rev_eco = 0;       /* 1: half-rate reverb tank (~50% lower CPU) */
+/* ADV FX (SEL pages): selectable rate reducer / distortion slot. */
 static uint32_t rr_acc, rr_inc;                           /* the rate reducer's phase accumulator */
 static int32_t rr_hold_l, rr_hold_r, rr_shift;
 static int32_t fx_drive, fx_makeup, fx_wet;               /* distortion (Q8), shared mix */
 static uint32_t fx_is_dist, fx_amt;
 
-#if REV_DIV == 2u
 static uint32_t fx_odd;
-
-#endif
 
 static void fx_init(void)
 {
@@ -144,10 +134,7 @@ static void fx_block(const patch_t *p, uint32_t quarter)
         break;
     }
 
-    /* ADV FX taps: the phaser (sweep follows the LFO) + the shared reducer / distortion slot */
-    ph_inc = ((uint32_t)p->v[P_LFO_RATE] + 4u) * 4500u;   /* ~0.18..6.1 Hz sweep */
-    ph_mix = (p->v[P_PHASER_MIX] * 256) / 100;
-    ph_mod = 128; ph_fb = 0; ph_c = 16384; ph_spread = 1500; ph_stage = 4;   /* fixed 4-stage */
+    /* ADV FX taps: the shared reducer / distortion slot */
     fx_is_dist = p->v[P_FX_MODE] != 0;
     {
         int32_t amt = p->v[P_FX_AMT];                        /* shared amount */
@@ -368,44 +355,22 @@ static void fx_process(int32_t *out, uint32_t n)
             r += wet;
         }
         if (do_rev) {
-#if REV_DIV == 2u                               /* half rate: a pair in, the output interpolated between ticks */
-            int32_t pl = rv_yl, pr = rv_yr, din = l + r;
-            if (!(fx_odd ^= 1u)) {
-                rev_tick((rv_hold + din) >> 2);
-                l += (((pl + rv_yl) >> 1) * rm) >> 8;
-                r += (((pr + rv_yr) >> 1) * rm) >> 8;
+            if (ctl_rev_eco || REV_DIV == 2u) { /* half rate: a pair in, the output interpolated between ticks */
+                int32_t pl = rv_yl, pr = rv_yr, din = l + r;
+                if (!(fx_odd ^= 1u)) {
+                    rev_tick((rv_hold + din) >> 2);
+                    l += (((pl + rv_yl) >> 1) * rm) >> 8;
+                    r += (((pr + rv_yr) >> 1) * rm) >> 8;
+                } else {
+                    l += (rv_yl * rm) >> 8;
+                    r += (rv_yr * rm) >> 8;
+                }
+                rv_hold = din;
             } else {
+                rev_tick((l + r) >> 1);
                 l += (rv_yl * rm) >> 8;
                 r += (rv_yr * rm) >> 8;
             }
-            rv_hold = din;
-#else
-            rev_tick((l + r) >> 1);
-            l += (rv_yl * rm) >> 8;
-            r += (rv_yr * rm) >> 8;
-#endif
-        }
-        if (ph_mix) {                       /* Viper-style: 2..8 allpass stages, dry+wet summing */
-            int32_t l0 = l, r0 = r, s, lfo;
-            lfo = ((int32_t)tri_q(ph_ph) * ph_mod) >> 5;   /* sweep +-0.5 at full mod: the notches travel */
-            ph_ph += ph_inc;
-            /* feedback + dry into the chain; states stay bounded */
-            l = sat16(l0 + ((ph_fb * ph_fbl) >> 8));
-            r = sat16(r0 + ((ph_fb * ph_fbr) >> 8));
-            for (s = 0; s < 8; s++) {
-                int32_t cs, y;
-                if (s >= ph_stage) break;
-                cs = ph_c + lfo + ph_spread * ((int32_t)s - (ph_stage >> 1));
-                if (cs < 2048) cs = 2048;
-                if (cs > 30000) cs = 30000;
-                y = sat16((((cs * (l - ph_y1[s])) >> 15) + ph_x1[s]));
-                ph_x1[s] = l; ph_y1[s] = y; l = y;
-                y = sat16((((cs * (r - ph_y2[s])) >> 15) + ph_x2[s]));
-                ph_x2[s] = r; ph_y2[s] = y; r = y;
-            }
-            ph_fbl = l; ph_fbr = r;        /* the wet tail for the next sample's feedback */
-            l = l0 + (((l - l0) * ph_mix) >> 9);   /* dry + wet/2 at full mix: the notches */
-            r = r0 + (((r - r0) * ph_mix) >> 9);
         }
         if (!fx_amt) {                      /* bypass: the slot is off */
         } else {                            /* selector picks the engine; amount + mix are shared */

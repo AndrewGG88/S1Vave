@@ -22,7 +22,7 @@ Descarga e instala la versión oficial para tu sistema operativo desarrollada po
 ## Paso 2: Instalar S1Vave
 
 ### Opción A: Windows (Instalador Automático)
-Ejecuta `S1Vave-v1.12.3-Windows-Setup.exe`.
+Ejecuta `S1Vave-v2.0-Windows-Setup.exe`.
 Copia automáticamente el motor de audio, metadatos, icono e interfaz web en las carpetas de VIBE FM:
 * Carpeta de usuario: `%APPDATA%\VIBE FM\Firmware`
 * Carpeta de sistema: `C:\ProgramData\VIBE FM\Firmware`
@@ -49,7 +49,16 @@ Descomprime `s1vave.zip` y coloca los archivos `s1vave.wasm`, `s1vave.json`, `s1
 
 ---
 
+## Solución de Problemas (Pantalla en Blanco en Ableton Live 12 / Windows)
+
+Si la ventana del plugin VIBE FM se abre totalmente en blanco en Ableton Live 12 u otro DAW en Windows:
+1. Instala o repara **Microsoft Edge WebView2 Runtime** (Evergreen Bootstrapper) y reinicia tu DAW.
+2. Haz clic derecho sobre el plugin en el navegador de Ableton para activar o desactivar **Auto-Scale Plugin Window** (escalado HiDPI), o define la variable de entorno `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu` si hay conflicto con tu controlador gráfico.
+
+---
+
 ## Créditos y Licencias
 
 * Sintetizador S1Vave: Andrew GG (GNU General Public License v3.0)
 * Plugin VIBE FM y OberVave: Sven Trogus (zvenson, https://thefirmwarehub.com/vibe/)
+

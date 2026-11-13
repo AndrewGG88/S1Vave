@@ -628,24 +628,95 @@ static void layer_knob(knob_view_t *k, uint32_t i)
     }
 }
 
+static uint16_t param_cat_color(int32_t p)
+{
+    if (p == P_CUTOFF || p == P_RESO || p == P_KEYTRK || p == P_FLT_BEND ||
+        p == P_FLT_COLOR || p == P_TONE || p == P_WARMTH)
+        return C_CAT_FLT;
+    if (p == P_PWM_SRC || p == P_PWM_DEPTH)
+        return C_CAT_PWM;
+    if (p == P_FENV_AMT || p == P_FLFO_AMT ||
+        (p >= P_ATTACK && p <= P_ENV_TRG) || (p >= P_LFO_RATE && p <= P_LFO_TRIG) ||
+        p == P_MOD_DEPTH)
+        return C_CAT_MOD;
+    if ((p >= P_CHO_MODE && p <= P_FX_MIX) && p != P_SPREAD && p != P_DETUNE)
+        return C_CAT_FX;
+    if (p == P_POLY_MODE || p == P_PORTA_MODE || p == P_PORTA_TIME || p == P_PORTA_SW ||
+        p == P_TRANSPOSE || p == P_VOLUME || (p >= P_CHORD_SW2 && p <= P_CHORD_KS4) ||
+        p == P_OSC_BEND || p == P_SPREAD || p == P_DETUNE)
+        return C_CAT_GLO;
+    return C_CAT_OSC;
+}
+
+static void page_cat_info(uint32_t pg, const char **tag, uint16_t *col)
+{
+    if (layer == L_EDIT) { *tag = "SEQ"; *col = C_CAT_OSC; return; }
+    if (layer == L_GLO)  { *tag = "SYS"; *col = C_CAT_GLO; return; }
+    if (layer == L_SAVE) { *tag = "MEM"; *col = C_CAT_GLO; return; }
+    if (layer == L_FX)   { *tag = "FX";  *col = C_CAT_FX;  return; }
+    if (seq_shown())     { *tag = "SEQ"; *col = C_CAT_OSC; return; }
+    if (pg == PG_OSC_PWM) { *tag = "PWM"; *col = C_CAT_PWM; return; }
+    if (pg == PG_FILTER) { *tag = "FLT"; *col = C_CAT_FLT; return; }
+    if ((pg >= PG_ADSR && pg <= PG_ENV_MOD) || (pg >= PG_LFO && pg <= PG_LFO_MOD)) {
+        *tag = "MOD"; *col = C_CAT_MOD; return;
+    }
+    if ((pg >= PG_FX_MIX && pg <= PG_REVERB) || pg == PG_ADV1 || pg == PG_ADV2) {
+        *tag = "FX"; *col = C_CAT_FX; return;
+    }
+    if (pg == PG_ARP || pg == PG_ARP_CFG) { *tag = "ARP"; *col = C_CAT_ARP; return; }
+    if (pg == PG_VOICE || pg == PG_GLOBAL) { *tag = "SYS"; *col = C_CAT_GLO; return; }
+    *tag = (pg == PG_PERFORM) ? "PERF" : "OSC";
+    *col = C_CAT_OSC;
+}
+
+static const char *page_pos_str(uint32_t pg)
+{
+    static char buf[8];
+    uint32_t idx = 0, cnt = 0;
+    if (pg >= PG_OSC_CORE && pg <= PG_FILTER) { idx = pg - PG_OSC_CORE + 1u; cnt = 6u; }
+    else if (pg >= PG_ADSR && pg <= PG_ENV_MOD) { idx = pg - PG_ADSR + 1u; cnt = 2u; }
+    else if (pg >= PG_LFO && pg <= PG_LFO_MOD) { idx = pg - PG_LFO + 1u; cnt = 2u; }
+    else if (pg >= PG_FX_MIX && pg <= PG_REVERB) { idx = pg - PG_FX_MIX + 1u; cnt = 3u; }
+    else if (pg >= PG_VOICE && pg <= PG_GLOBAL) { idx = pg - PG_VOICE + 1u; cnt = 2u; }
+    else if (pg >= PG_ARP && pg <= PG_ARP_CFG) { idx = pg - PG_ARP + 1u; cnt = 2u; }
+    else if (pg >= PG_ADV1 && pg <= PG_ADV2) { idx = pg - PG_ADV1 + 1u; cnt = 2u; }
+    if (!cnt) return 0;
+    buf[0] = (char)('0' + idx);
+    buf[1] = '/';
+    buf[2] = (char)('0' + cnt);
+    buf[3] = 0;
+    return buf;
+}
+
 static void draw_page(void)
 {
     knob_view_t k[4];
     uint32_t i;
     const page_t *pg = &PAGE[page];
+    const char *cat_tag = "OSC";
+    uint16_t cat_col = C_CAT_OSC;
+    page_cat_info(page, &cat_tag, &cat_col);
     for (i = 0; i < 4u; i++) {
         int32_t p = pg->p[i];
         k[i].present = 0;
         k[i].bip = 0;
+        k[i].col = cat_col;
         k[i].value[0] = 0;
         if (page == PG_GLOBAL && !layer && !SMK_PAD_HELD) {
             static const char *const GL[4] = {"TEMPO", "CLICK", "MIDI CH", "TUNE"};
+            uint32_t clk = (set.click & 0x07u) % NCLICK;
             k[i].label = GL[i];
             k[i].present = 1;
             if (i == 0) { fmt_u(k[i].value, set.tempo); k[i].v = set.tempo - 40; k[i].max = 200; }
-            else if (i == 1) { scat(k[i].value, CLICK_NAME[set.click % NCLICK]); k[i].v = set.click % NCLICK; k[i].max = NCLICK - 1; }
+            else if (i == 1) { scat(k[i].value, CLICK_NAME[clk]); k[i].v = (int32_t)clk; k[i].max = NCLICK - 1; }
             else if (i == 2) { if (set.midi_ch) fmt_u(k[i].value, set.midi_ch); else scat(k[i].value, "OMNI"); k[i].v = set.midi_ch; k[i].max = 16; }
             else { scat(k[i].value, set.tune < 0 ? "-" : "+"); fmt_u(k[i].value + 1, (uint32_t)(set.tune < 0 ? -set.tune : set.tune)); scat(k[i].value, "c"); k[i].v = set.tune + 50; k[i].max = 100; k[i].bip = 1; }
+        } else if (page == PG_ADV2 && !layer && i == 3) {
+            k[i].label = "REV ECO";
+            k[i].v = ctl_rev_eco & 1u;
+            k[i].max = 1;
+            k[i].present = 1;
+            scat(k[i].value, ctl_rev_eco ? "ECO" : "HQ");
         } else if (page == PG_OSC_DRAW && !layer) {
             k[i].present = 1;
             if (i == 0) {
@@ -726,7 +797,7 @@ static void draw_page(void)
         } else if (page == PG_ARP_CFG && !layer) {
             k[i].present = (i == 0);
             if (i == 0) {
-                k[i].label = "NOTE PRI";
+                k[i].label = "ARP PRI";
                 k[i].v = ctl_note_pri & 1u;
                 k[i].max = 1;
                 scat(k[i].value, ctl_note_pri ? "LOW" : "LAST");
@@ -740,6 +811,7 @@ static void draw_page(void)
             k[i].v = ed_patch((uint32_t)p)->v[p];
             k[i].max = PDEF[p].max;
             k[i].bip = PDEF[p].kind == K_BIP || PDEF[p].kind == K_SEMI;
+            k[i].col = param_cat_color(p);
             k[i].present = 1;
             param_value(k[i].value, (uint32_t)p, (uint32_t)ed_patch((uint32_t)p)->v[p]);
         }
@@ -762,7 +834,8 @@ static void draw_page(void)
         {
             static char cpu[16];                /* the GLOBAL page: the render time of an audio half (budget 5800 us) */
             cpu[0] = 0; scat(cpu, "CPU "); fmt_u(cpu + slen(cpu), ui_render_us); scat(cpu, "us");
-            ui_page(t, k, save_armed ? "SAVE?" : seq_shown() && pat_edited ? "EDITED" : page == PG_GLOBAL && !layer ? cpu : 0);
+            ui_page(t, cat_tag, cat_col, k, save_armed ? "SAVE?" : seq_shown() && pat_edited ? "EDITED" : page == PG_GLOBAL && !layer ? cpu : 0,
+                    !layer ? page_pos_str(page) : 0);
         }
     }
 }
@@ -1281,7 +1354,7 @@ static void seq_view_knob(knob_view_t *k, uint32_t i)
 /* the full screen: what to draw (the main loop calls these when something changed) */
 static void draw_seq_top(void)
 {
-    static char mid[16], right[20];
+    static char mid[16], right[20], seq_pos[6];
     uint32_t t = seq_trk;
     mid[0] = right[0] = 0;
     scat(mid, "PAT "); fmt_u(mid + slen(mid), set.pat + 1u);
@@ -1290,9 +1363,13 @@ static void draw_seq_top(void)
     if (pat.trk[t].mute) scat(mid, " MUTE");
     fmt_u(right, ctl_ext_quarter ? 60u * FS / ctl_ext_quarter : set.tempo);
     scat(right, rec == REC_ON ? "  REC" : rec == REC_READY ? "  ARMED" : ctl_seq_run ? "  PLAY" : "  STOP");
+    seq_pos[0] = (char)('1' + (seq_view % NSV));
+    seq_pos[1] = '/';
+    seq_pos[2] = (char)('0' + NSV);
+    seq_pos[3] = 0;
     ui_trk = t;
     ui_seq_top(t, layer == L_SEQ ? "SEQ KEYS" : layer == L_EDIT ? "ERASE" : SV_NAME[seq_view], mid, right,
-               rec ? C_RED : ctl_seq_run ? C_AMBER : C_DIMT, pat.trk[1].len == 0);
+               rec ? C_RED : ctl_seq_run ? C_AMBER : C_DIMT, pat.trk[1].len == 0, !layer ? seq_pos : 0);
 }
 
 static int32_t seq_playhead(void)
@@ -1453,7 +1530,7 @@ static void draw_seq_knobs(void)
 #define KEY0 53u                               /* key 0 = F3 */
 /* the keys and MIDI in: read by the main loop, and while the screen is drawn (app_idle, notes only), so the notes
  * of a chord or among a stream of CCs are not held up by a redraw (a knob page is ~30 ms on the SPI alone) */
-static uint32_t dirty_hdr = 1, dirty_page = 1, dirty_tags = 1, dirty_steps = 1;
+static uint32_t dirty_hdr = 1, dirty_page = 1, dirty_tags = 1, dirty_steps = 1, dirty_scope = 1;
 static uint32_t keys_prev, clk_n, clk_t0, clk_last, idle_ok;
 static uint8_t held_key[27], key_step[27];
 static int notes_shown(void) { return seq_shown() || rec; }   /* the only screens a note changes */
@@ -1495,11 +1572,11 @@ static void keys_in(uint32_t notes_only)
             } else {
                 if (page == PG_OSC_DRAW && !layer && KEY_STEP[k] >= 0 && KEY_STEP[k] < 16) {
                     draw_cur_step = (uint8_t)KEY_STEP[k];
-                    dirty_page = dirty_steps = 1;
+                    dirty_page = dirty_steps = dirty_scope = 1;
                 } else if (page == PG_OSC_CHOP && !layer && KEY_STEP[k] >= 0 && KEY_STEP[k] < 16) {
                     pat.chop_mask[chop_cur_target] ^= (1u << KEY_STEP[k]);
                     pat_edited = 1;
-                    dirty_page = dirty_steps = 1;
+                    dirty_page = dirty_steps = dirty_scope = 1;
                 }
                 play_note(1, held_key[k], KEY_VEL(k)); midi_send(0x90, held_key[k], KEY_VEL(k));
                 if (rec_keys()) rec_note(1, held_key[k], KEY_VEL(k));
@@ -1601,6 +1678,14 @@ static void midi_in(uint32_t notes_only)
                 dirty_page = 1;
             }
             else if (d1 == 7u) ctl_cc7 = d2;
+            else if (d1 == 48u) {
+                uint32_t eco = d2 >= 64u ? 1u : 0u;
+                ctl_rev_eco = eco;
+                if (eco) set.click |= 0x80u; else set.click &= 0x7Fu;
+                set_dirty = 1; set_t = fm1_ms;
+                say(eco ? "REV ECO ON" : "REV HQ");
+                dirty_page = 1;
+            }
             else if (d1 == 64u) ctl_sustain = d2 >= 64u;
             else if (d1 == 111u) {
                 ctl_arp_on = d2 >= 64u ? 1u : 0u;
@@ -1701,6 +1786,11 @@ static void midi_in(uint32_t notes_only)
     }
 }
 
+#define PAT_CHUNK_RAW 96u
+#define PAT_CHUNKS ((uint32_t)((sizeof(pattern_t) + PAT_CHUNK_RAW - 1u) / PAT_CHUNK_RAW))
+static pattern_t syx_rx_pat, syx_tx_pat;
+static uint32_t syx_rx_mask, syx_tx_slot = 0xFFFFFFFFu;
+
 static void app_sysex(uint32_t cmd, const uint8_t *body, uint32_t len)
 {
     if (cmd == 0x20u && len >= 1u) {
@@ -1755,10 +1845,70 @@ static void app_sysex(uint32_t cmd, const uint8_t *body, uint32_t len)
             if (len >= 122u) {
                 memcpy(pat.draw_table, body + 82, 32);
                 memcpy(pat.chop_mask, body + 114, 8);
+                dirty_scope = 1;
             }
         }
         say("SYX SAVED");
         dirty_hdr = dirty_page = dirty_tags = 1;
+#ifndef OBV_HOST
+        {
+            uint8_t ack[2] = {body[0], 0u};
+            ota_send_msg(0x22u, ack, 2u);
+        }
+#endif
+    } else if (cmd == 0x24u && len >= 2u) {
+#ifndef OBV_HOST
+        uint32_t s_raw = body[0], s = s_raw == 0x7Fu ? set.pat : s_raw, c = body[1];
+        uint32_t off = c * PAT_CHUNK_RAW, n;
+        uint8_t pkt[3u + PAT_CHUNK_RAW];
+        if (s >= NPAT || c >= PAT_CHUNKS) return;
+        if (c == 0u || syx_tx_slot != s) {
+            if (s == set.pat || s_raw == 0x7Fu) syx_tx_pat = pat;
+            else if (blob_load(s, &syx_tx_pat, sizeof syx_tx_pat) || syx_tx_pat.magic != PAT_MAGIC)
+                pat_factory(s, &syx_tx_pat);
+            syx_tx_slot = s;
+        }
+        n = sizeof(pattern_t) - off;
+        if (n > PAT_CHUNK_RAW) n = PAT_CHUNK_RAW;
+        pkt[0] = (uint8_t)s_raw;
+        pkt[1] = (uint8_t)c;
+        pkt[2] = (uint8_t)PAT_CHUNKS;
+        memcpy(pkt + 3, (const uint8_t *)&syx_tx_pat + off, n);
+        ota_send_msg(0x25u, pkt, 3u + n);
+#endif
+    } else if (cmd == 0x25u && len >= 4u) {
+        uint32_t s_raw = body[0], s = s_raw == 0x7Fu ? set.pat : s_raw;
+        uint32_t c = body[1], tot = body[2], off = c * PAT_CHUNK_RAW, rem, n;
+        if (s >= NPAT || c >= PAT_CHUNKS || tot != PAT_CHUNKS) return;
+        if (c == 0u) syx_rx_mask = 0u;
+        rem = sizeof(pattern_t) - off;
+        n = len - 3u;
+        if (n > rem) n = rem;
+        memcpy((uint8_t *)&syx_rx_pat + off, body + 3, n);
+        syx_rx_mask |= (1u << c);
+#ifndef OBV_HOST
+        {
+            uint8_t ack[2] = {(uint8_t)s_raw, (uint8_t)c};
+            ota_send_msg(0x26u, ack, 2u);
+        }
+#endif
+        if (c + 1u == PAT_CHUNKS && syx_rx_pat.magic == PAT_MAGIC &&
+            syx_rx_pat.trk[0].len <= SEQ_STEPS && syx_rx_pat.trk[1].len <= SEQ_STEPS &&
+            (uint32_t)syx_rx_pat.trk[0].len + (uint32_t)syx_rx_pat.trk[1].len <= SEQ_STEPS) {
+            slot_len[s][0] = syx_rx_pat.trk[0].len;
+            slot_len[s][1] = syx_rx_pat.trk[1].len;
+            if (!ctl_seq_run) blob_save(s, &syx_rx_pat, sizeof syx_rx_pat);
+            if (s == set.pat || s_raw == 0x7Fu) {
+                ctl_panic = 1;
+                pat = syx_rx_pat;
+                seq_cur[0] = seq_cur[1] = seq_pg[0] = seq_pg[1] = 0u;
+                pat_edited = 0u;
+                pat_dirty = ctl_seq_run ? 1u : 0u;
+                if (pat.tempo >= 40u && pat.tempo <= 240u) { set.tempo = pat.tempo; ctl_tempo = pat.tempo; }
+            }
+            say("SEQ SAVED");
+            dirty_hdr = dirty_page = dirty_tags = dirty_steps = dirty_scope = 1;
+        }
     }
 }
 
@@ -1817,6 +1967,7 @@ static void app_main(void)
     if (set.midi_ch > 16u) set.midi_ch = 0;
     ctl_tempo = set.tempo;
     ctl_tune8 = set.tune * 256 / 100;
+    ctl_rev_eco = (set.click & 0x80u) != 0u;
     load_pattern(set.pat);
     load_program(set.prog);
     b_load();
@@ -1935,7 +2086,7 @@ static void app_main(void)
 #if BOARD_SMK37
         smk_buttons(b, &dirty_steps);           /* FADER BANK, < > */
 #endif
-        ctl_click = set.click % NCLICK == CLICK_ON || (rec == REC_ON && set.click % NCLICK != CLICK_OFF);
+        ctl_click = (set.click & 0x07u) % NCLICK == CLICK_ON || (rec == REC_ON && (set.click & 0x07u) % NCLICK != CLICK_OFF);
         static uint32_t oct_held;
         static uint32_t oct_t;
         static uint8_t oct_used;
@@ -2019,7 +2170,7 @@ static void app_main(void)
         }
         if (b & (1u << BTN_SEL) && !layer) np = cycle_page(PG_ADV1, 2);   /* the free button: ADV */
         if (b & (1u << BTN_ENV)) np = cycle_page(PG_ADSR, 2);
-        if (b & (1u << BTN_LFO)) np = cycle_page(PG_LFO, 3);
+        if (b & (1u << BTN_LFO)) np = cycle_page(PG_LFO, 2);
         if (b & (1u << BTN_ARP)) {
             arp_btn_down = 1;
             arp_btn_t = fm1_ms;
@@ -2049,7 +2200,7 @@ static void app_main(void)
         if (b & (1u << BTN_PLAY)) {             /* start from step 1 / stop (a take ends with it) */
             if (ctl_seq_run) { ctl_seq_run = 0; if (rec == REC_ON) rec = REC_OFF; }
             else {
-                if (rec == REC_READY) { rec = REC_ON; undo_save(); ctl_count = set.click % NCLICK == CLICK_COUNT; }
+                if (rec == REC_READY) { rec = REC_ON; undo_save(); ctl_count = (set.click & 0x07u) % NCLICK == CLICK_COUNT; }
                 ctl_seq_restart = 1; ctl_seq_run = 1;
             }
             dirty_tags = dirty_steps = 1;
@@ -2092,6 +2243,8 @@ static void app_main(void)
                 lcd_fill(0, 0, 240, 240, C_PANEL);
                 dirty_hdr = dirty_tags = 1; scope_state = 1; t_scope = 0;
             }
+            if (np == PG_OSC_DRAW || np == PG_OSC_CHOP || page == PG_OSC_DRAW || page == PG_OSC_CHOP)
+                dirty_scope = 1;
             entry_reset();
             page = np; dirty_page = dirty_steps = 1; step_held = -1; audition_off(); hints_key = 0xFFFFFFFFu; leds_q = 0xFFFFFFFFu;
         }
@@ -2171,7 +2324,7 @@ static void app_main(void)
             if (e > 1 || e < -1) e *= 3;        /* a fast turn goes further */
             if (page == PG_GLOBAL && !layer && !SMK_PAD_HELD) {   /* (a held layer has the knobs, on every page) */
                 if (k == 0) { set.tempo = (uint8_t)clampi(set.tempo + e, 40, 240); ctl_tempo = set.tempo; pat.tempo = set.tempo; }
-                else if (k == 1) set.click = (uint8_t)clampi((int32_t)(set.click % NCLICK) + (e > 0 ? 1 : -1), 0, NCLICK - 1);
+                else if (k == 1) set.click = (uint8_t)((set.click & 0x80u) | (uint32_t)clampi((int32_t)((set.click & 0x07u) % NCLICK) + (e > 0 ? 1 : -1), 0, NCLICK - 1));
                 else if (k == 2) set.midi_ch = (uint8_t)clampi(set.midi_ch + e, 0, 16);
                 else { set.tune = (int8_t)clampi(set.tune + e, -50, 50); ctl_tune8 = set.tune * 256 / 100; }
                 set_dirty = 1; set_t = fm1_ms;
@@ -2195,7 +2348,7 @@ static void app_main(void)
                     pat.draw_table[draw_cur_step] = (int16_t)clampi(cur, -32767, 32767);
                     pat_edited = 1;
                 }
-                dirty_hdr = 1;
+                dirty_scope = 1;
             } else if (page == PG_OSC_CHOP && !layer) {
                 if (k == 0) set_param(P_CHOP_OVTN, (int32_t)ed_patch(P_CHOP_OVTN)->v[P_CHOP_OVTN] + e * 2);
                 else if (k == 1) set_param(P_CHOP_COMB, (int32_t)ed_patch(P_CHOP_COMB)->v[P_CHOP_COMB] + e);
@@ -2207,7 +2360,15 @@ static void app_main(void)
                     pat.chop_mask[chop_cur_target] = MASK_PRESETS[mask_idx];
                     pat_edited = 1;
                 }
-                dirty_hdr = 1;
+                dirty_scope = 1;
+            } else if (page == PG_ADV2 && !layer && k == 3) {
+                uint32_t eco = e > 0 ? 1u : 0u;
+                if (eco != (ctl_rev_eco & 1u)) {
+                    ctl_rev_eco = eco;
+                    if (eco) set.click |= 0x80u; else set.click &= 0x7Fu;
+                    set_dirty = 1; set_t = fm1_ms;
+                    say(eco ? "REV ECO ON" : "REV HQ");
+                }
             } else if (page == PG_ARP && !layer) {
                 if (k == 0) {
                     ctl_arp_on = clampi((int32_t)ctl_arp_on + e, 0, 1);
@@ -2329,7 +2490,7 @@ static void app_main(void)
         fm1_led_key(BTN_HOME, page == PG_PERFORM);
         fm1_led_key(BTN_EDIT, page >= PG_OSC_CORE && page <= PG_FILTER);
         fm1_led_key(BTN_ENV, page == PG_ADSR || page == PG_ENV_MOD);
-        fm1_led_key(BTN_LFO, page == PG_LFO || page == PG_LFO_MOD || page == PG_RISER);
+        fm1_led_key(BTN_LFO, page == PG_LFO || page == PG_LFO_MOD);
         fm1_led_key(BTN_FX, page == PG_FX_MIX || page == PG_DELAY || page == PG_REVERB);
         fm1_led_key(BTN_GLO, page == PG_VOICE || page == PG_GLOBAL);
         fm1_led_key(BTN_SEL, page == PG_ADV1 || page == PG_ADV2);
@@ -2416,6 +2577,9 @@ static void app_main(void)
         if (seq_shown() || rec) {               /* the sequencer's strip instead of the scope */
             if (ui_seq_ticks != ticks_seen) { ticks_seen = ui_seq_ticks; dirty_steps = 1; }
             if (dirty_steps && fm1_ms - t_steps >= 30u) { dirty_steps = 0; t_steps = fm1_ms; draw_steps(); }
+        } else if (dirty_scope && fm1_ms - t_scope >= 25u) {
+            dirty_scope = 0; t_scope = fm1_ms;
+            draw_scope();
         } else if (scope_state == 3u && fm1_ms - t_scope >= 50u) {
             uint32_t v, best = 0, bl = 0;
             t_scope = fm1_ms;

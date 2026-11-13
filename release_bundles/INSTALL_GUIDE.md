@@ -22,7 +22,7 @@ Download and run the official installer for your operating system by Sven Trogus
 ## Step 2: Install S1Vave
 
 ### Option A: Windows (Automatic Installer)
-Run `S1Vave-v1.12.3-Windows-Setup.exe`.
+Run `S1Vave-v2.0-Windows-Setup.exe`.
 This automatically installs the engine, metadata, icon, and custom web interface into the VIBE FM firmware directories:
 * User folder: `%APPDATA%\VIBE FM\Firmware`
 * System folder: `C:\ProgramData\VIBE FM\Firmware`
@@ -49,7 +49,16 @@ Extract `s1vave.zip` and place `s1vave.wasm`, `s1vave.json`, `s1vave.png`, and t
 
 ---
 
+## Troubleshooting (Blank White Screen on Windows / Ableton Live 12)
+
+If the VIBE FM plugin window opens as a blank white screen in Ableton Live 12 or another Windows DAW:
+1. Install or repair the **Microsoft Edge WebView2 Runtime** (Evergreen Bootstrapper) and restart your DAW.
+2. Right-click the plugin in Ableton's browser to toggle **Auto-Scale Plugin Window**, or set environment variable `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu` if GPU compositing conflicts with your graphics driver.
+
+---
+
 ## Credits and Licenses
 
 * S1Vave Synthesizer: Andrew GG (GNU General Public License v3.0)
 * VIBE FM Plugin and OberVave: Sven Trogus (zvenson, https://thefirmwarehub.com/vibe/)
+

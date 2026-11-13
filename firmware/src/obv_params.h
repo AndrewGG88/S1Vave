@@ -232,14 +232,14 @@ static const pdef_t PDEF[NPARAM] = {
     [P_CHORD_SW2]   = {"V2 SW",   1,   1,           K_ONOFF,   81},
     [P_CHORD_SW3]   = {"V3 SW",   1,   1,           K_ONOFF,   82},
     [P_CHORD_SW4]   = {"V4 SW",   1,   1,           K_ONOFF,   83},
-    [P_CHORD_KS2]   = {"V2 SHIFT",24,  12,          K_SEMI,    85},
-    [P_CHORD_KS3]   = {"V3 SHIFT",24,  12,          K_SEMI,    86},
-    [P_CHORD_KS4]   = {"V4 SHIFT",24,  12,          K_SEMI,    87},
+    [P_CHORD_KS2]   = {"V2 SHFT", 24,  12,          K_SEMI,    85},
+    [P_CHORD_KS3]   = {"V3 SHFT", 24,  12,          K_SEMI,    86},
+    [P_CHORD_KS4]   = {"V4 SHFT", 24,  12,          K_SEMI,    87},
 
     /* ADV: stereo, phaser & the lo-fi/distortion slot (defaults = 0: stock S-1 behaviour) */
     [P_SPREAD]      = {"SPREAD",  100, 0,           K_NUM,     41},
     [P_DETUNE]      = {"DETUNE",  50,  0,           K_NUM,     42},
-    [P_PHASER_MIX]  = {"PHR MIX", 100, 0,           K_NUM,     43},
+    [P_PHASER_MIX]  = {"PHR MIX", 100, 0,           K_NUM,     0},
     [P_FX_MODE]     = {"FX MODE", 1,   0,           K_FXMODE,  45},
     [P_FX_AMT]      = {"FX AMT",  100, 0,           K_NUM,     46},
     [P_FX_MIX]      = {"FX MIX",  100, 50,          K_NUM,     47},
@@ -307,9 +307,9 @@ enum {
 
     /* EDIT Button Pages (1..6) */
     PG_OSC_CORE,    /* Range, Square Level, Saw Level, Sub Level */
-    PG_OSC_PWM,     /* PWM Source, Duty Cycle, Square Level, Sub Type */
+    PG_OSC_PWM,     /* PWM Depth, PWM Source, Square Level, LFO Rate */
     PG_OSC_SUB,     /* Sub Type, Noise Level, Noise Mode, Fine Tune */
-    PG_OSC_DRAW,    /* Draw Switch, Multiply, PWM Source, Duty Cycle */
+    PG_OSC_DRAW,    /* Draw Switch, Multiply, Step, Amplitude */
     PG_OSC_CHOP,    /* Chop Overtone, Comb, -1, -1 */
     PG_FILTER,      /* Cutoff, Reso, Filter LFO, Key Follow */
 
@@ -317,10 +317,9 @@ enum {
     PG_ADSR,        /* Attack, Decay, Sustain, Release */
     PG_ENV_MOD,     /* Env Trig Mode, Amp Mode, PWM Source, PWM Depth */
 
-    /* LFO Button Pages (1..3) */
+    /* LFO Button Pages (1..2) */
     PG_LFO,         /* Rate, Waveform, LFO Sync, LFO Mode */
-    PG_LFO_MOD,     /* Pitch Depth, Filter LFO Depth, PWM Depth, Key Trigger */
-    PG_RISER,       /* Riser Mode, Resonance, Shape, Level */
+    PG_LFO_MOD,     /* Pitch Depth, Filter LFO Depth, Mod Depth, Key Trigger */
 
     /* FX Button Pages (1..3) */
     PG_FX_MIX,      /* FX Mix: Chorus Mode, Delay Level, Reverb Level, Delay Time */
@@ -336,24 +335,23 @@ enum {
     PG_SEQ,         /* Sequencer view (drawn by hand) */
 
     /* SEL Button Pages (1..2): the advanced controls */
-    PG_ADV1,        /* Spread, Detune, Phaser Mix, FX Mode */
-    PG_ADV2,        /* Rate-Reducer Amount, Distortion Amount, -1, -1 */
+    PG_ADV1,        /* Spread, Detune, -1, -1 */
+    PG_ADV2,        /* FX Mode, FX Amount, FX Mix, -1 */
     NPAGE
 };
 
 static const page_t PAGE[NPAGE] = {
     [PG_PERFORM]    = {"PERFORM",   {P_CUTOFF, P_RESO, P_FENV_AMT, P_PORTA_TIME}},
     [PG_OSC_CORE]   = {"OSC CORE",  {P_RANGE, P_PULSE_LVL, P_SAW_LVL, P_SUB_LVL}},
-    [PG_OSC_PWM]    = {"OSC PWM",   {P_PWM_SRC, P_PWM_DEPTH, P_PULSE_LVL, P_SUB_TYPE}},
+    [PG_OSC_PWM]    = {"OSC PWM",   {P_PWM_DEPTH, P_PWM_SRC, P_PULSE_LVL, P_LFO_RATE}},
     [PG_OSC_SUB]    = {"SUB/NOISE", {P_SUB_TYPE, P_NOISE_LVL, P_NOISE_MODE, P_FINE_TUNE}},
-    [PG_OSC_DRAW]   = {"OSC DRAW",  {P_DRAW_SW, P_DRAW_MULT, P_PWM_SRC, P_PWM_DEPTH}},
+    [PG_OSC_DRAW]   = {"OSC DRAW",  {P_DRAW_SW, P_DRAW_MULT, -1, -1}},
     [PG_OSC_CHOP]   = {"OSC CHOP",  {P_CHOP_OVTN, P_CHOP_COMB, -1, -1}},
     [PG_FILTER]     = {"FILTER",    {P_CUTOFF, P_RESO, P_FLFO_AMT, P_KEYTRK}},
     [PG_ADSR]       = {"ENVELOPE",  {P_ATTACK, P_DECAY, P_SUSTAIN, P_RELEASE}},
     [PG_ENV_MOD]    = {"ENV / PWM", {P_ENV_TRG, P_AMP_MODE, P_PWM_SRC, P_PWM_DEPTH}},
     [PG_LFO]        = {"LFO",       {P_LFO_RATE, P_LFO_WAVE, P_LFO_SYNC, P_LFO_MODE}},
     [PG_LFO_MOD]    = {"LFO MOD",   {P_LFO_PITCH, P_FLFO_AMT, P_PWM_DEPTH, P_LFO_TRIG}},
-    [PG_RISER]      = {"RISER",     {P_RISER_MODE, P_RISER_RESO, P_RISER_SHAPE, P_RISER_LVL}},
     [PG_FX_MIX]     = {"FX MIX",    {P_CHO_MODE, P_DLY_LVL, P_REV_LVL, P_DLY_TIME}},
     [PG_DELAY]      = {"DELAY",     {P_DLY_LVL, P_DLY_TIME, P_DLY_FB, P_DLY_SYNC}},
     [PG_REVERB]     = {"REVERB",    {P_REV_LVL, P_REV_TIME, P_REV_TYPE, P_REV_PRE}},
@@ -362,8 +360,8 @@ static const page_t PAGE[NPAGE] = {
     [PG_ARP]        = {"ARPEGGIO",  {-1, -1, -1, -1}},
     [PG_ARP_CFG]    = {"ARP CONFIG",{-1, -1, -1, -1}},
     [PG_SEQ]        = {"SEQUENCER", {-1, -1, -1, -1}},
-    [PG_ADV1]       = {"ADV MIX",   {P_SPREAD, P_DETUNE, P_PHASER_MIX, P_FX_MODE}},
-    [PG_ADV2]       = {"ADV FX",    {P_FX_AMT, P_FX_MIX, -1, -1}},
+    [PG_ADV1]       = {"STEREO",    {P_SPREAD, P_DETUNE, -1, -1}},
+    [PG_ADV2]       = {"LOFI/ECO",  {P_FX_MODE, P_FX_AMT, P_FX_MIX, -1}},
 };
 
 typedef struct { uint8_t v[PATCH_BYTES]; } patch_t;

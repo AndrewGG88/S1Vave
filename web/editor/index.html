@@ -77,6 +77,26 @@
           <span class="icon">📂</span> IMPORT JSON
         </button>
         <input type="file" id="fileImportJson" accept=".json" style="display:none">
+
+        <div class="toolbar-divider"></div>
+
+        <span class="toolbar-label">SEQ:</span>
+        <button class="tool-action-btn read-synth-btn" id="btnGrabSeq" title="Pull current sequence (Tracks A &amp; B) from hardware FM-1">
+          <span class="icon">📥</span> GRAB SEQ
+        </button>
+        <button class="tool-action-btn" id="btnSendSeq" title="Push loaded sequence (Tracks A &amp; B) to hardware FM-1">
+          <span class="icon">📤</span> SEND SEQ
+        </button>
+        <button class="tool-action-btn" id="btnSaveSeq" title="Save sequence backup as .s1seq file">
+          <span class="icon">💾</span> SAVE .S1SEQ
+        </button>
+        <button class="tool-action-btn" id="btnLoadSeq" title="Load sequence backup from .s1seq file">
+          <span class="icon">📂</span> LOAD .S1SEQ
+        </button>
+        <button class="tool-action-btn" id="btnExportMidi" title="Export sequence Tracks A &amp; B as Standard MIDI (.mid)">
+          <span class="icon">🎵</span> EXPORT .MID
+        </button>
+        <input type="file" id="fileLoadSeq" accept=".s1seq" style="display:none">
       </div>
 
       <div class="toolbar-right">
@@ -444,10 +464,10 @@
         </div>
       </section>
 
-      <!-- 4. LFO & RISER -->
+      <!-- 4. LFO MODULATION -->
       <section class="panel-card lfo-panel">
         <div class="card-header">
-          <h2>4. LFO &amp; RISER</h2>
+          <h2>4. LFO MODULATION</h2>
           <span class="badge">MOD</span>
         </div>
         <div class="controls-grid">
@@ -512,44 +532,6 @@
               <button class="opt-btn active" data-val="0">OFF</button>
               <button class="opt-btn" data-val="1">ON</button>
             </div>
-          </div>
-
-          <!-- Riser Section in Panel 4 -->
-          <div class="ctrl-group full-width">
-            <label>RISER MODE <span class="cc">CC 32 / CC 78</span></label>
-            <div class="range-selector" id="grpRiserMode">
-              <button class="opt-btn active" data-val="0">OFF</button>
-              <button class="opt-btn" data-val="1">SYNC</button>
-              <button class="opt-btn" data-val="2">QUIV</button>
-              <button class="opt-btn" data-val="3">QV.PAN</button>
-            </div>
-          </div>
-
-          <div class="slider-box">
-            <div class="slider-header">
-              <label>RISER RESO</label>
-              <span class="val-display" id="valRiserReso">30</span>
-            </div>
-            <input type="range" min="0" max="100" value="30" id="slRiserReso" data-cc="33">
-            <span class="cc-tag">CC 33</span>
-          </div>
-
-          <div class="slider-box">
-            <div class="slider-header">
-              <label>RISER SHAPE</label>
-              <span class="val-display" id="valRiserShape">0</span>
-            </div>
-            <input type="range" min="0" max="100" value="0" id="slRiserShape" data-cc="34">
-            <span class="cc-tag">CC 34 (SAW&rarr;SQR)</span>
-          </div>
-
-          <div class="slider-box">
-            <div class="slider-header">
-              <label>RISER LEVEL</label>
-              <span class="val-display" id="valRiserLvl">80</span>
-            </div>
-            <input type="range" min="0" max="100" value="80" id="slRiserLvl" data-cc="35">
-            <span class="cc-tag">CC 35</span>
           </div>
         </div>
       </section>
@@ -708,10 +690,8 @@
             <input type="range" min="4" max="124" value="64" id="slTranspose" data-cc="77">
         <input type="range" min="0" max="100" value="0" id="slSpread" data-cc="41">
         <input type="range" min="0" max="50" value="0" id="slDetune" data-cc="42">
-        <input type="range" min="0" max="100" value="0" id="slPhaserMix" data-cc="43">
         <input type="range" min="0" max="100" value="0" id="slFxAmt" data-cc="46">
         <input type="range" min="0" max="100" value="50" id="slFxMix" data-cc="47">
-        <input type="range" min="0" max="127" value="48" id="slPhaserRate" data-cc="44">
         <input type="range" min="0" max="1" value="0" id="slFxMode" data-cc="45">
 
             <span class="cc-tag">CC 77 (-60..+60)</span>

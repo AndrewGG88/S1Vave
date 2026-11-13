@@ -93,10 +93,6 @@ const state = {
     79: 0,    // LFO Mode (0=NORM, 1=FAST)
     106: 0,   // LFO Sync (0=OFF, 1=ON)
     105: 0,   // LFO Key Trigger (0=OFF, 1=ON)
-    32: 0,    // Riser Mode (0=OFF, 1=SYNC, 2=QUIV, 3=QV.PAN)
-    33: 30,   // Riser Resonance (0..100)
-    34: 0,    // Riser Shape (0..100)
-    35: 80,   // Riser Level (0..100)
     93: 0,    // Chorus Type (0=OFF, 1..4)
     92: 0,    // Delay Level
     90: 50,   // Delay Time
@@ -321,6 +317,10 @@ function setMidiInput(id) {
 function onIncomingMidi(e) {
   const data = e.data;
   if (!data || data.length < 1) return;
+  if (data[0] === 0xF0 && data.length >= 4 && data[data.length - 1] === 0xF7) {
+    handleIncomingSysex(data);
+    return;
+  }
   const status = data[0] & 0xF0;
   const d1 = data[1];
   const d2 = data[2] !== undefined ? data[2] : 0;
@@ -703,8 +703,6 @@ function toggleAB() {
 
 // --- 5. Parameter UI Binding ---
 function formatSliderVal(id, val) {
-  if (id === 'slTone') return (val - 64 > 0 ? '+' : '') + (val - 64);
-  if (id === 'slWarmth') return `${Math.round(val * 100 / 127)}%`;
   if (id === 'slTune') return (val - 64 > 0 ? '+' : '') + (val - 64);
   if (id === 'slTranspose') return (val - 64 > 0 ? '+' : '') + (val - 64) + ' ST';
   if (id === 'slChordKs2' || id === 'slChordKs3' || id === 'slChordKs4') {
@@ -713,7 +711,6 @@ function formatSliderVal(id, val) {
   if (id === 'slOscBend' || id === 'slFltBend') return `${val} ST`;
   if (id === 'slRevPre') return `${val} ms`;
   if (id === 'slTempo') return `${val} BPM`;
-  if (id === 'slRiserShape') return `${val}%`;
   if (id === 'slDrawMult' || id === 'slChopComb') return `${val + 1}.0x`;
   if (id === 'slChopOvtn') {
     if (val === 0) return 'OFF (0)';
@@ -750,17 +747,12 @@ function setupButtonGroups() {
   setupGroup('grpSubType', 22, val => val);       // 0=-2o.A, 1=-2oc, 2=-1oc
   setupGroup('grpDrawSw', 107, val => val);       // 0=OFF, 1=STEP, 2=SLOPE
   setupGroup('grpNoiseMode', 78, val => val);     // 0=PINK, 1=WHITE
-  setupGroup('grpFltColor', 108, val => val);     // 0=S-1 CLEAN, 1=MIDNIGHT WARM
   setupGroup('grpAmpMode', 28, val => val);       // 0=GATE, 1=ENV
   setupGroup('grpEnvTrg', 29, val => val);        // 0=LFO, 1=GATE, 2=GATE+TRIG
   setupGroup('grpLfoWave', 12, val => val);       // 0=SAW, 1=INV, 2=TRI, 3=SQR, 4=RND, 5=NOI
   setupGroup('grpLfoMode', 79, val => val);       // 0=NORM, 1=FAST
   setupGroup('grpLfoSync', 106, val => val);      // 0=OFF, 1=ON
   setupGroup('grpLfoTrig', 105, val => val);      // 0=OFF, 1=ON
-  setupGroup('grpRiserMode', 32, val => {
-    sendCC(78, val); // Roland S-1 compatibility
-    return val;
-  });
   setupGroup('grpChoMode', 93, val => val);       // 0=OFF, 1=1, 2=2, 3=3, 4=4
   setupGroup('grpDlySync', 37, val => val);       // 0=OFF, 1=ON
   setupGroup('grpRevType', 38, val => val);       // 0=AMB, 1=ROOM, 2=HALL1, 3=HALL2, 4=PLATE, 5=SPRING, 6=MOD
@@ -850,8 +842,6 @@ function updateSingleParamUI(cc, val) {
   else if (cc === 102) updateSliderUI('slDrawMult', val);
   else if (cc === 103) updateSliderUI('slChopOvtn', val);
   else if (cc === 104) updateSliderUI('slChopComb', val);
-  else if (cc === 109) updateSliderUI('slTone', val);
-  else if (cc === 110) updateSliderUI('slWarmth', val);
   else if (cc === 74) updateSliderUI('slCutoff', val);
   else if (cc === 71) updateSliderUI('slReso', val);
   else if (cc === 24) updateSliderUI('slFenv', val);
@@ -865,9 +855,6 @@ function updateSingleParamUI(cc, val) {
   else if (cc === 3) updateSliderUI('slLfoRate', val);
   else if (cc === 13) updateSliderUI('slLfoPitch', val);
   else if (cc === 1) updateSliderUI('slModDepth', val);
-  else if (cc === 33) updateSliderUI('slRiserReso', val);
-  else if (cc === 34) updateSliderUI('slRiserShape', val);
-  else if (cc === 35) updateSliderUI('slRiserLvl', val);
   else if (cc === 92) updateSliderUI('slDlyLvl', val);
   else if (cc === 90) updateSliderUI('slDlyTime', val);
   else if (cc === 36) updateSliderUI('slDlyFb', val);
@@ -886,18 +873,13 @@ function updateSingleParamUI(cc, val) {
   else if (cc === 16) updateGroupUI('grpPwmSrc', val);
   else if (cc === 22) updateGroupUI('grpSubType', val);
   else if (cc === 107) updateGroupUI('grpDrawSw', val);
-  else if (cc === 78) {
-    updateGroupUI('grpNoiseMode', val);
-    updateGroupUI('grpRiserMode', val);
-  }
-  else if (cc === 108) updateGroupUI('grpFltColor', val);
+  else if (cc === 78) updateGroupUI('grpNoiseMode', val);
   else if (cc === 28) updateGroupUI('grpAmpMode', val);
   else if (cc === 29) updateGroupUI('grpEnvTrg', val);
   else if (cc === 12) updateGroupUI('grpLfoWave', val);
   else if (cc === 79) updateGroupUI('grpLfoMode', val);
   else if (cc === 106) updateGroupUI('grpLfoSync', val);
   else if (cc === 105) updateGroupUI('grpLfoTrig', val);
-  else if (cc === 32) updateGroupUI('grpRiserMode', val);
   else if (cc === 93) updateGroupUI('grpChoMode', val);
   else if (cc === 37) updateGroupUI('grpDlySync', val);
   else if (cc === 38) updateGroupUI('grpRevType', val);
@@ -1006,10 +988,6 @@ const BASELINE_INIT_PATCH = {
   79: 0,
   106: 0,
   105: 0,
-  32: 0,    // Riser Mode OFF
-  33: 30,   // Riser Reso
-  34: 0,    // Riser Shape Saw
-  35: 80,   // Riser Lvl
   93: 0,    // Chorus Off
   92: 0,    // Delay Off
   90: 50,
@@ -1027,8 +1005,6 @@ const BASELINE_INIT_PATCH = {
   77: 64,   // Transpose 0 (Center=64)
         41: 0,    // Spread (0 = mono)
         42: 0,    // Detune cents
-        43: 0,    // Phaser mix
-        44: 48,   // Phaser rate
         45: 0,    // FX mode (0 = reduce, 1 = dist)
         46: 0,    // Slot amount (shared)
         47: 50,   // Slot mix (shared)
@@ -1134,7 +1110,12 @@ function setupPatchToolbar() {
   // 5. Export JSON
   const btnExport = document.getElementById('btnExportJson');
   if (btnExport) {
-    btnExport.addEventListener('click', () => {
+    btnExport.addEventListener('click', async () => {
+      const tgt = await promptSaveFile(`s1vave_patch_${Date.now()}.json`, 'S1Vave Patch (.json)', 'application/json', '.json');
+      if (!tgt) {
+        showStatusAlert('EXPORT CANCELLED');
+        return;
+      }
       const patchData = {
         name: 'S1Vave Patch',
         version: '1.0',
@@ -1142,19 +1123,10 @@ function setupPatchToolbar() {
         timestamp: new Date().toISOString(),
         params: state.params
       };
-
-      const blob = new Blob([JSON.stringify(patchData, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `s1vave_patch_${Date.now()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      showStatusAlert('PATCH EXPORTED TO JSON FILE');
-      logMidiEvent('SYS', 'HOST', 'SYS', `Exported patch (${Object.keys(state.params).length} CCs) to JSON.`, []);
+      const bytes = new TextEncoder().encode(JSON.stringify(patchData, null, 2));
+      const savedName = await finishSaveFile(tgt, bytes, 'application/json');
+      showStatusAlert(`PATCH EXPORTED: ${savedName}`);
+      logMidiEvent('SYS', 'HOST', 'SYS', `Exported patch (${Object.keys(state.params).length} CCs) to ${savedName}.`, []);
     });
   }
 
@@ -1182,6 +1154,70 @@ function setupPatchToolbar() {
       };
       reader.readAsText(file);
       fileInput.value = '';
+    });
+  }
+
+  // 6b. Hardware FM-1 Sequence Transfer (.s1seq) & Standard MIDI (.mid) Export
+  const btnGrabSeq = document.getElementById('btnGrabSeq');
+  if (btnGrabSeq) btnGrabSeq.addEventListener('click', () => startGrabSequence(null));
+
+  const btnSendSeq = document.getElementById('btnSendSeq');
+  if (btnSendSeq) btnSendSeq.addEventListener('click', () => startSendSequence());
+
+  const btnSaveSeq = document.getElementById('btnSaveSeq');
+  if (btnSaveSeq) {
+    btnSaveSeq.addEventListener('click', async () => {
+      const tgt = await promptSaveFile(`s1vave_seq_${Date.now()}.s1seq`, 'S1Vave Sequence (.s1seq)', 'application/octet-stream', '.s1seq');
+      if (!tgt) {
+        showStatusAlert('SAVE CANCELLED');
+        return;
+      }
+      seqTransfer.saveTarget = tgt;
+      if (state.lastPatternBytes) {
+        await downloadPatternAsS1Seq(state.lastPatternBytes, tgt);
+      } else {
+        startGrabSequence('s1seq');
+      }
+    });
+  }
+
+  const btnExportMidi = document.getElementById('btnExportMidi');
+  if (btnExportMidi) {
+    btnExportMidi.addEventListener('click', async () => {
+      const tgt = await promptSaveFile(`s1vave_seq_${Date.now()}.mid`, 'Standard MIDI File (.mid)', 'audio/midi', '.mid');
+      if (!tgt) {
+        showStatusAlert('EXPORT CANCELLED');
+        return;
+      }
+      seqTransfer.saveTarget = tgt;
+      if (state.lastPatternBytes) {
+        await downloadPatternAsMidi(state.lastPatternBytes, tgt);
+      } else {
+        startGrabSequence('mid');
+      }
+    });
+  }
+
+  const btnLoadSeq = document.getElementById('btnLoadSeq');
+  const fileLoadSeq = document.getElementById('fileLoadSeq');
+  if (btnLoadSeq && fileLoadSeq) {
+    btnLoadSeq.addEventListener('click', () => fileLoadSeq.click());
+    fileLoadSeq.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const bytes = new Uint8Array(ev.target.result);
+        if (bytes.length < 2116 || bytes[0] !== 0x53 || bytes[1] !== 0x56 || bytes[2] !== 0x53 || bytes[3] !== 0x31) {
+          showStatusAlert('ERROR: INVALID .S1SEQ FILE (EXPECTED SVS1 HEADER)');
+          return;
+        }
+        state.lastPatternBytes = bytes.slice(0, 2116);
+        showStatusAlert(`LOADED ${file.name} (${bytes.length} B) — READY TO SEND OR EXPORT .MID`);
+        logMidiEvent('SYS', 'HOST', 'SEQ', `Loaded .s1seq pattern from ${file.name}.`, []);
+      };
+      reader.readAsArrayBuffer(file);
+      fileLoadSeq.value = '';
     });
   }
 
@@ -2319,6 +2355,380 @@ async function initAudioMonitor() {
   } catch (e) {
     // Standalone / offline mode
   }
+}
+
+// --- 13b. FM-1 Sequence SysEx Transfer (0x24/0x25/0x26) & SMF .MID Export ---
+const PAT_SIZE = 2116;
+const PAT_CHUNK_RAW = 96;
+const PAT_CHUNKS = Math.ceil(PAT_SIZE / PAT_CHUNK_RAW); // 23
+
+const seqTransfer = {
+  mode: null,       // 'grab' | 'send' | null
+  afterGrab: null,  // 's1seq' | 'mid' | null
+  chunkIdx: 0,
+  rxBuf: new Uint8Array(PAT_SIZE),
+  timer: null
+};
+
+function p7pack(bytes) {
+  let acc = 0, nb = 0;
+  const out = [];
+  for (let i = 0; i < bytes.length; i++) {
+    acc |= (bytes[i] & 0xFF) << nb;
+    nb += 8;
+    while (nb >= 7) {
+      out.push(acc & 0x7F);
+      acc >>>= 7;
+      nb -= 7;
+    }
+  }
+  if (nb > 0) out.push(acc & 0x7F);
+  return out;
+}
+
+function p7unpack(packed) {
+  let acc = 0, nb = 0;
+  const out = [];
+  for (let i = 0; i < packed.length; i++) {
+    acc |= (packed[i] & 0x7F) << nb;
+    nb += 7;
+    if (nb >= 8) {
+      out.push(acc & 0xFF);
+      acc >>>= 8;
+      nb -= 8;
+    }
+  }
+  return new Uint8Array(out);
+}
+
+function sendFm1Sysex(cmd, body) {
+  if (!state.fm1Out) {
+    showStatusAlert('FM-1 MIDI OUTPUT NOT CONNECTED');
+    return false;
+  }
+  let sum = 0;
+  for (let i = 0; i < body.length; i++) sum = (sum + body[i]) & 0xFF;
+  const msg = new Uint8Array(7 + body.length);
+  msg[0] = 0x00; msg[1] = 0x59; msg[2] = cmd & 0xFF;
+  msg[3] = body.length & 0xFF; msg[4] = 0x00; msg[5] = 0x00;
+  msg.set(body, 6);
+  msg[6 + body.length] = (~sum) & 0xFF;
+  const wire = [0xF0, ...p7pack(msg), 0xF7];
+  try {
+    state.fm1Out.send(wire);
+    return true;
+  } catch (err) {
+    console.error('SysEx send failed:', err);
+    showStatusAlert('SYSEX SEND ERROR');
+    return false;
+  }
+}
+
+function resetSeqTimer() {
+  if (seqTransfer.timer) clearTimeout(seqTransfer.timer);
+  seqTransfer.timer = setTimeout(() => {
+    if (seqTransfer.mode) {
+      seqTransfer.mode = null;
+      seqTransfer.afterGrab = null;
+      showStatusAlert('SEQUENCE TRANSFER TIMED OUT (CHECK FM-1 CONNECTION)');
+    }
+  }, 4000);
+}
+
+function startGrabSequence(afterAction) {
+  if (!state.fm1Out) {
+    showStatusAlert('CONNECT M-VAVE FM-1 TO GRAB SEQUENCE');
+    return;
+  }
+  seqTransfer.mode = 'grab';
+  seqTransfer.afterGrab = afterAction || null;
+  seqTransfer.chunkIdx = 0;
+  seqTransfer.rxBuf.fill(0);
+  showStatusAlert('GRABBING SEQUENCE FROM FM-1 (0/' + PAT_CHUNKS + ')...');
+  resetSeqTimer();
+  sendFm1Sysex(0x24, new Uint8Array([0x7F, 0]));
+}
+
+function startSendSequence() {
+  if (!state.lastPatternBytes || state.lastPatternBytes.length < PAT_SIZE) {
+    showStatusAlert('GRAB OR LOAD A .S1SEQ SEQUENCE FIRST');
+    return;
+  }
+  if (!state.fm1Out) {
+    showStatusAlert('CONNECT M-VAVE FM-1 TO SEND SEQUENCE');
+    return;
+  }
+  seqTransfer.mode = 'send';
+  seqTransfer.chunkIdx = 0;
+  sendSeqChunk(0);
+}
+
+function sendSeqChunk(c) {
+  const off = c * PAT_CHUNK_RAW;
+  const n = Math.min(PAT_CHUNK_RAW, PAT_SIZE - off);
+  const pkt = new Uint8Array(3 + n);
+  pkt[0] = 0x7F;
+  pkt[1] = c;
+  pkt[2] = PAT_CHUNKS;
+  pkt.set(state.lastPatternBytes.subarray(off, off + n), 3);
+  showStatusAlert(`SENDING SEQUENCE TO FM-1 (${c + 1}/${PAT_CHUNKS})...`);
+  resetSeqTimer();
+  sendFm1Sysex(0x25, pkt);
+}
+
+function handleIncomingSysex(wire) {
+  const dec = p7unpack(wire.slice(1, wire.length - 1));
+  if (dec.length < 7 || dec[0] !== 0x00 || dec[1] !== 0x59) return;
+  const bodyLen = dec[3];
+  if (bodyLen + 7 !== dec.length) return;
+  let sum = 0;
+  for (let i = 6; i + 1 < dec.length; i++) sum = (sum + dec[i]) & 0xFF;
+  if (((~sum) & 0xFF) !== dec[dec.length - 1]) return;
+
+  const cmd = dec[2];
+  if (cmd === 0x25 && bodyLen >= 4 && seqTransfer.mode === 'grab') {
+    const c = dec[7], tot = dec[8];
+    if (c >= PAT_CHUNKS || tot !== PAT_CHUNKS) return;
+    const off = c * PAT_CHUNK_RAW;
+    const clen = Math.min(bodyLen - 3, PAT_SIZE - off);
+    seqTransfer.rxBuf.set(dec.subarray(9, 9 + clen), off);
+    seqTransfer.chunkIdx = c + 1;
+    if (seqTransfer.chunkIdx >= PAT_CHUNKS) {
+      if (seqTransfer.timer) clearTimeout(seqTransfer.timer);
+      const after = seqTransfer.afterGrab;
+      seqTransfer.mode = null;
+      seqTransfer.afterGrab = null;
+      const dv = new DataView(seqTransfer.rxBuf.buffer);
+      if (dv.getUint32(0, true) !== 0x31535653) {
+        showStatusAlert('SEQUENCE ERROR: INVALID HEADER');
+        return;
+      }
+      state.lastPatternBytes = seqTransfer.rxBuf.slice(0, PAT_SIZE);
+      showStatusAlert('SEQUENCE GRABBED FROM FM-1!');
+      logMidiEvent('IN', 'FM-1', 'SEQ', 'Grabbed sequence (Tracks A & B, 2116 B) from FM-1.', []);
+      if (after === 's1seq') downloadPatternAsS1Seq(state.lastPatternBytes, seqTransfer.saveTarget);
+      else if (after === 'mid') downloadPatternAsMidi(state.lastPatternBytes, seqTransfer.saveTarget);
+      seqTransfer.saveTarget = null;
+    } else {
+      showStatusAlert(`GRABBING SEQUENCE (${seqTransfer.chunkIdx}/${PAT_CHUNKS})...`);
+      resetSeqTimer();
+      sendFm1Sysex(0x24, new Uint8Array([0x7F, seqTransfer.chunkIdx]));
+    }
+  } else if (cmd === 0x26 && bodyLen >= 2 && seqTransfer.mode === 'send') {
+    seqTransfer.chunkIdx++;
+    if (seqTransfer.chunkIdx >= PAT_CHUNKS) {
+      if (seqTransfer.timer) clearTimeout(seqTransfer.timer);
+      seqTransfer.mode = null;
+      showStatusAlert('SEQUENCE SENT TO FM-1!');
+      logMidiEvent('OUT', 'FM-1', 'SEQ', 'Sent sequence (Tracks A & B) to FM-1.', []);
+    } else {
+      sendSeqChunk(seqTransfer.chunkIdx);
+    }
+  }
+}
+
+function triggerBinaryDownload(bytes, filename, mime) {
+  const blob = new Blob([bytes], { type: mime || 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+async function promptSaveFile(suggestedName, description, mime, ext) {
+  if (typeof window.showSaveFilePicker === 'function') {
+    try {
+      const accept = {};
+      accept[mime || 'application/octet-stream'] = [ext || '.bin'];
+      const handle = await window.showSaveFilePicker({
+        suggestedName,
+        types: [{ description: description || 'S1Vave File', accept }]
+      });
+      return { handle, name: handle.name || suggestedName };
+    } catch (err) {
+      if (err && err.name === 'AbortError') return null;
+    }
+  }
+  const chosen = window.prompt('Save file as:', suggestedName);
+  if (chosen === null) return null;
+  return { handle: null, name: chosen.trim() || suggestedName };
+}
+
+async function finishSaveFile(target, bytes, mime) {
+  const name = (target && target.name) ? target.name : 's1vave_export.bin';
+  if (target && target.handle) {
+    const writable = await target.handle.createWritable();
+    await writable.write(bytes);
+    await writable.close();
+    return name;
+  }
+  triggerBinaryDownload(bytes, name, mime);
+  return name;
+}
+
+async function downloadPatternAsS1Seq(patBytes, target) {
+  const tgt = target || { handle: null, name: `s1vave_seq_${Date.now()}.s1seq` };
+  const savedName = await finishSaveFile(tgt, patBytes, 'application/octet-stream');
+  showStatusAlert(`SAVED ${savedName}`);
+  logMidiEvent('SYS', 'HOST', 'SEQ', `Exported pattern backup (${savedName}).`, []);
+}
+
+function patternToMidiBytes(patBytes, fallbackBpm) {
+  const dv = new DataView(patBytes.buffer, patBytes.byteOffset, patBytes.byteLength);
+  if (dv.getUint32(0, true) !== 0x31535653) throw new Error('Invalid SVS1 pattern');
+
+  function writeVarLen(out, val) {
+    let v = val >>> 0;
+    const buf = [v & 0x7F];
+    while ((v >>= 7) > 0) buf.push((v & 0x7F) | 0x80);
+    for (let i = buf.length - 1; i >= 0; i--) out.push(buf[i]);
+  }
+  function makeChunk(tag, data) {
+    const len = data.length;
+    return [
+      tag.charCodeAt(0), tag.charCodeAt(1), tag.charCodeAt(2), tag.charCodeAt(3),
+      (len >>> 24) & 0xFF, (len >>> 16) & 0xFF, (len >>> 8) & 0xFF, len & 0xFF,
+      ...data
+    ];
+  }
+  function encodeTrack(events) {
+    events.sort((a, b) => a.tick - b.tick || a.order - b.order);
+    const body = [];
+    let prev = 0;
+    for (const ev of events) {
+      const dt = Math.max(0, ev.tick - prev);
+      prev = ev.tick;
+      writeVarLen(body, dt);
+      for (const b of ev.bytes) body.push(b);
+    }
+    writeVarLen(body, 0);
+    body.push(0xFF, 0x2F, 0x00);
+    return makeChunk('MTrk', body);
+  }
+
+  const PPQ = 480;
+  const DIV_PER_Q = [1, 2, 4, 8, 3, 6];
+  let bpm = patBytes[2111];
+  if (bpm < 40 || bpm > 240) bpm = fallbackBpm || 120;
+  const usPerQuarter = Math.round(60000000 / bpm);
+
+  const metaEvents = [
+    { tick: 0, order: 0, bytes: [0xFF, 0x03, 11, 83, 49, 86, 97, 118, 101, 32, 83, 121, 110, 99] },
+    { tick: 0, order: 1, bytes: [0xFF, 0x51, 0x03, (usPerQuarter >> 16) & 0xFF, (usPerQuarter >> 8) & 0xFF, usPerQuarter & 0xFF] }
+  ];
+  const tracks = [encodeTrack(metaEvents)];
+
+  for (let t = 0; t < 2; t++) {
+    const trkOff = 4 + t * 8;
+    const len = dv.getUint16(trkOff, true);
+    if (!len) continue;
+    const divIdx = Math.min(5, patBytes[trkOff + 2]);
+    const swing = Math.max(50, Math.min(75, patBytes[trkOff + 3] || 50));
+    const transp = dv.getInt8(trkOff + 4);
+    const baseStepTicks = PPQ / DIV_PER_Q[divIdx];
+    const events = [];
+    const trkName = t === 0 ? 'S1Vave Track A' : 'S1Vave Track B';
+    const nameBytes = [0xFF, 0x03, trkName.length];
+    for (let i = 0; i < trkName.length; i++) nameBytes.push(trkName.charCodeAt(i));
+    events.push({ tick: 0, order: 0, bytes: nameBytes });
+
+    const stepStart = new Array(len + 1);
+    stepStart[0] = 0;
+    for (let i = 0; i < len; i += 2) {
+      const pair = baseStepTicks * 2;
+      const d1 = (pair * swing) / 100;
+      stepStart[i + 1] = stepStart[i] + d1;
+      if (i + 2 <= len) stepStart[i + 2] = stepStart[i + 1] + (pair - d1);
+    }
+
+    const activeTies = new Set();
+    for (let i = 0; i < len; i++) {
+      const slot = t === 0 ? i : (255 - i);
+      const off = 20 + slot * 8;
+      const notes = [patBytes[off], patBytes[off + 1], patBytes[off + 2], patBytes[off + 3]];
+      const vel = Math.max(1, Math.min(127, patBytes[off + 4] || 100));
+      const gate = patBytes[off + 5] || 96;
+      const ratch = patBytes[off + 6];
+      const t0 = Math.round(stepStart[i]);
+      const t1 = Math.round(stepStart[i + 1]);
+      const dur = Math.max(12, t1 - t0);
+
+      if ((ratch & 0x80) !== 0) {
+        activeTies.forEach((n) => events.push({ tick: t0, order: 1, bytes: [0x80 | t, n, 0] }));
+        activeTies.clear();
+        continue;
+      }
+
+      const stepNotes = [];
+      for (let k = 0; k < 4; k++) {
+        if (notes[k]) stepNotes.push(Math.max(0, Math.min(127, notes[k] + transp)));
+      }
+      activeTies.forEach((n) => {
+        if (!stepNotes.includes(n)) {
+          events.push({ tick: t0, order: 1, bytes: [0x80 | t, n, 0] });
+          activeTies.delete(n);
+        }
+      });
+      if (stepNotes.length === 0) continue;
+
+      const ratchCount = (ratch & 3) + 1;
+      const isTie = gate === 127 && i + 1 < len;
+      if (ratchCount > 1) {
+        const subDur = dur / ratchCount;
+        const subOn = Math.max(8, Math.round(subDur * (gate / 127)));
+        for (let r = 0; r < ratchCount; r++) {
+          const rt0 = Math.round(t0 + r * subDur);
+          const rt1 = (isTie && r === ratchCount - 1) ? t1 : Math.min(t1 - 1, rt0 + subOn);
+          for (const nn of stepNotes) {
+            events.push({ tick: rt0, order: 2, bytes: [0x90 | t, nn, vel] });
+            if (!(isTie && r === ratchCount - 1)) {
+              events.push({ tick: Math.max(rt0 + 4, rt1), order: 1, bytes: [0x80 | t, nn, 0] });
+            } else {
+              activeTies.add(nn);
+            }
+          }
+        }
+      } else {
+        const gateTicks = Math.max(8, Math.round((dur * Math.max(8, gate)) / 127));
+        for (const nn of stepNotes) {
+          if (!activeTies.has(nn)) events.push({ tick: t0, order: 2, bytes: [0x90 | t, nn, vel] });
+          if (isTie) activeTies.add(nn);
+          else {
+            events.push({ tick: Math.min(t1 - 1, t0 + gateTicks), order: 1, bytes: [0x80 | t, nn, 0] });
+            activeTies.delete(nn);
+          }
+        }
+      }
+    }
+    const endTick = Math.round(stepStart[len]);
+    activeTies.forEach((nn) => events.push({ tick: endTick, order: 1, bytes: [0x80 | t, nn, 0] }));
+    tracks.push(encodeTrack(events));
+  }
+
+  const hdr = makeChunk('MThd', [0x00, 0x01, (tracks.length >> 8) & 0xFF, tracks.length & 0xFF, (PPQ >> 8) & 0xFF, PPQ & 0xFF]);
+  const total = hdr.length + tracks.reduce((s, tr) => s + tr.length, 0);
+  const out = new Uint8Array(total);
+  out.set(hdr, 0);
+  let pos = hdr.length;
+  for (const tr of tracks) {
+    out.set(tr, pos);
+    pos += tr.length;
+  }
+  return out;
+}
+
+async function downloadPatternAsMidi(patBytes, target) {
+  const bpmEl = document.getElementById('numBpm');
+  const fallbackBpm = bpmEl ? parseInt(bpmEl.value, 10) || 120 : 120;
+  const midiBytes = patternToMidiBytes(patBytes, fallbackBpm);
+  const tgt = target || { handle: null, name: `s1vave_seq_${Date.now()}.mid` };
+  const savedName = await finishSaveFile(tgt, midiBytes, 'audio/midi');
+  showStatusAlert(`EXPORTED MIDI: ${savedName}`);
+  logMidiEvent('SYS', 'HOST', 'MIDI', `Exported Tracks A & B to ${savedName} (${midiBytes.length} B).`, []);
 }
 
 // --- 14. Bootstrap Everything on DOM Ready ---

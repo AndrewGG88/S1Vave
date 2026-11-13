@@ -25,7 +25,7 @@ if [ -z "$WASM_OPT" ]; then
 fi
 mkdir -p build/sim docs/sim
 V=$(head -n 1 VERSION 2>/dev/null | tr -d '\r\n')
-[ -n "$V" ] || V="1.11"
+[ -n "$V" ] || V="2.0"
 nice -n 15 $ZIG cc --target=wasm32-freestanding -mcpu=generic+bulk_memory -O2 -fno-builtin -ffreestanding -nostdlib \
     -Wall -Wno-unused-function -Wno-unused-variable -Wno-unused-but-set-variable \
     -Ifirmware/src -Ifirmware/gen -DAPP_VER="\"$V\"" \

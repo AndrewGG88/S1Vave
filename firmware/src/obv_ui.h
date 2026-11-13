@@ -23,6 +23,14 @@
 #define C_SCOPE_GRID RGB(16, 22, 24)            /* Precision graticule grid */
 #define C_MUTED RGB(75, 90, 96)                 /* Muted footer text */
 #define C_CYAN_LOGO RGB(14, 186, 251)           /* Exact Andrew GG electric cyan (#0ebafb) */
+/* Page & parameter category colors for hierarchy & modulation contrast */
+#define C_CAT_OSC  C_AMBER                      /* Emerald teal: Oscillator & Perform */
+#define C_CAT_FLT  C_ORANGE                     /* Tangerine orange: Filter & Filter Char */
+#define C_CAT_MOD  RGB(32, 188, 255)            /* Electric sky-blue: LFO, ENV & Modulation */
+#define C_CAT_PWM  RGB(255, 212, 36)            /* Amber gold: PWM depth & source */
+#define C_CAT_FX   RGB(96, 152, 255)            /* Cobalt blue: Chorus, Delay, Reverb, Stereo/FX */
+#define C_CAT_ARP  RGB(184, 108, 255)           /* Vivid violet: Arpeggiator */
+#define C_CAT_GLO  RGB(255, 192, 64)            /* Gold amber: Voice, Global & System */
 static const uint16_t STRIPE[3] = {RGB(0, 140, 95), RGB(0, 230, 163), RGB(40, 255, 185)};
 
 /* a * (1 - t) + b * t for RGB565, t = 0..256 */
@@ -103,23 +111,35 @@ static void cv_led_collar(int32_t cx, int32_t cy, int32_t r_in, int32_t r_out, i
         } else {
             is_lit = (deg >= cur_ang);
         }
-        seg_c = is_lit ? lit_c : RGB(30, 36, 40);
+        uint16_t off_c = blend565(RGB(22, 26, 30), lit_c, 52);
+        seg_c = is_lit ? lit_c : off_c;
         knob_xy(cx, cy, r_in, deg, &x0, &y0);
         knob_xy(cx, cy, r_out, deg, &x1, &y1);
         cv_line2(x0, y0, x1, y1, seg_c);
     }
 }
 
-/* AIRA Studio Knob: LED collar with illuminated indicator pip and crisp value */
-static void cv_knob(int32_t cx, int32_t cy, const char *label, const char *value, int32_t v, int32_t max, int32_t bip)
+/* AIRA Studio Knob: LED collar with cardinal detents, tactile bevel rim, and illuminated indicator pip */
+static void cv_knob(int32_t cx, int32_t cy, const char *label, const char *value, int32_t v, int32_t max, int32_t bip, uint16_t arc_c)
 {
-    int32_t ang = 225 - (max ? 270 * v / max : 0), px, py, qx, qy, r = 14;
-    uint16_t arc_c = (label[0] == 'C' && label[1] == 'U') || (label[0] == 'R' && label[1] == 'E' && label[2] == 'S') ? C_ORANGE : C_AMBER;
-    cv_text(cx - text_w(&FONT_S, label) / 2, cy - 44, &FONT_S, label, C_DIMT);
+    int32_t ang = 225 - (max ? 270 * v / max : 0), px, py, qx, qy, r = 14, i;
+    static const int16_t TICKS[3] = {225, 90, -45};
+    if (!arc_c) arc_c = (label[0] == 'C' && label[1] == 'U') || (label[0] == 'R' && label[1] == 'E' && label[2] == 'S') ? C_ORANGE : C_AMBER;
+    uint16_t bezel = blend565(C_KNOB_HI, arc_c, 96);
+    uint16_t rim_hi = blend565(bezel, C_CREAM, 40);
+    uint16_t lbl_c = blend565(arc_c, C_CREAM, 65);
+    cv_rect(cx - 12, cy - 49, 24, 2, arc_c);
+    cv_text(cx - text_w(&FONT_S, label) / 2, cy - 44, &FONT_S, label, lbl_c);
+    for (i = 0; i < 3; i++) {
+        knob_xy(cx, cy, r + 9, TICKS[i], &px, &py);
+        cv_rect(px, py, 2, 2, C_MUTED);
+    }
     cv_led_collar(cx, cy, r + 3, r + 7, ang, bip, arc_c);
     cv_disc(cx, cy, r, 0, C_KNOB);
-    cv_disc(cx, cy, r, 2, C_KNOB_HI);
-    knob_xy(cx, cy, r - 6, ang, &px, &py);
+    cv_disc(cx, cy, r, 2, bezel);
+    cv_disc(cx, cy, r - 2, 1, rim_hi);
+    cv_disc(cx, cy, 4, 0, C_SCOPE_BG);
+    knob_xy(cx, cy, 4, ang, &px, &py);
     knob_xy(cx, cy, r - 1, ang, &qx, &qy);
     cv_line2(px, py, qx, qy, arc_c);
     cv_text(cx - text_w(&FONT_S, value) / 2, cy + 24, &FONT_S, value, C_CREAM);
@@ -200,21 +220,46 @@ static void ui_header(uint32_t prog, const uint8_t *name, uint32_t edited, const
     cv_blit(0, 0);
 }
 
-typedef struct { const char *label; char value[12]; int32_t v, max, bip, present; } knob_view_t;
-static void ui_page(const char *title, const knob_view_t *k, const char *note)
+typedef struct { const char *label; char value[12]; int32_t v, max, bip, present; uint16_t col; } knob_view_t;
+static void ui_page(const char *title, const char *cat_tag, uint16_t cat_col, const knob_view_t *k, const char *note, const char *pg_pos)
 {
-    int32_t tw = text_w(&FONT_S, title), i;
+    int32_t tw = text_w(&FONT_S, title), pw = pg_pos ? text_w(&FONT_S, pg_pos) : 0, nw = note ? text_w(&FONT_S, note) : 0, i;
+    int32_t tag_w = (cat_tag && cat_tag[0]) ? (text_w(&FONT_S, cat_tag) + 6) : 0;
+    int32_t left_x = tag_w ? (3 + tag_w + 5) : 6;
+    int32_t bx = pg_pos ? (237 - (pw + 8)) : 237;
+    int32_t right_x = pg_pos ? (bx - 5) : 234;
+    int32_t tx = note ? left_x : (240 - tw) / 2;
+    uint16_t bg_fill;
+    if (!cat_col) cat_col = C_AMBER;
+    bg_fill = blend565(C_SCOPE_BG, cat_col, 24);
     cv_begin(240, 98, C_PANEL);
-    cv_rect(6, 9, (240 - tw) / 2 - 14, 1, C_RULE);
-    cv_text((240 - tw) / 2, 1, &FONT_S, title, C_AMBER);
-    cv_rect((240 + tw) / 2 + 8, 9, (240 - tw) / 2 - 14, 1, C_RULE);
+    /* Category-colored outline banner across the page header */
+    cv_rect(2, 0, 236, 17, cat_col);
+    cv_rect(3, 1, 234, 15, bg_fill);
+    if (tag_w) {
+        cv_rect(3, 1, tag_w, 15, cat_col);
+        cv_text(6, 1, &FONT_S, cat_tag, C_PANEL);
+    }
+    if (pg_pos) {
+        cv_rect(bx - 1, 1, 1, 15, cat_col);
+        cv_rect(bx, 1, pw + 7, 15, C_SCOPE_BG);
+        cv_text(bx + 4, 1, &FONT_S, pg_pos, cat_col);
+    }
+    if (!note) {
+        if (tx + tw > right_x) tx = right_x - tw;
+        if (tx < left_x) tx = left_x;
+    }
+    cv_text(tx, 1, &FONT_S, title, cat_col);
+    if (note) {
+        int32_t nx = right_x - nw;
+        if (nx < tx + tw + 4) nx = tx + tw + 4;
+        cv_text(nx, 1, &FONT_S, note, pg_pos ? C_ORANGE : C_RED);
+    }
     for (i = 0; i < 4; i++)
         if (k[i].present) {
-            cv_knob(30 + 60 * i, 62, k[i].label, k[i].value, k[i].v, k[i].max, k[i].bip);
+            cv_knob(30 + 60 * i, 62, k[i].label, k[i].value, k[i].v, k[i].max, k[i].bip, k[i].col ? k[i].col : cat_col);
             app_idle();                         /* (a knob is ~1 ms: the keys and MIDI in between) */
         }
-    if (note)
-        cv_text(240 - 4 - text_w(&FONT_S, note), 1, &FONT_S, note, C_RED);
     cv_blit(0, 46);
 }
 
@@ -382,9 +427,13 @@ static void ui_hints(const char *l1, const char *l2, uint16_t c1)
 static uint32_t ui_trk;
 #define C_TRK (ui_trk ? C_TRK_B : C_AMBER)
 
-static void ui_seq_top(uint32_t t, const char *view, const char *mid, const char *right, uint16_t rc, uint32_t b_off)
+static void ui_seq_top(uint32_t t, const char *view, const char *mid, const char *right, uint16_t rc, uint32_t b_off, const char *pg_pos)
 {
     uint32_t i;
+    int32_t vw = text_w(&FONT_S, view), mw = text_w(&FONT_S, mid), rw = text_w(&FONT_S, right);
+    int32_t pw = pg_pos ? text_w(&FONT_S, pg_pos) : 0;
+    int32_t rx = 236 - rw;
+    int32_t bx = rx - pw - 12;
     cv_begin(240, 24, C_PANEL);
     for (i = 0; i < 2u; i++) {                  /* both tracks: the one shown filled, the other a frame */
         char tl[2] = {(char)('A' + i), 0};
@@ -398,8 +447,14 @@ static void ui_seq_top(uint32_t t, const char *view, const char *mid, const char
         }
     }
     cv_text(46, 3, &FONT_S, view, C_TRK);
-    cv_text(50 + text_w(&FONT_S, view), 3, &FONT_S, mid, C_CREAM);
-    cv_text(236 - text_w(&FONT_S, right), 3, &FONT_S, right, rc);
+    cv_text(50 + vw, 3, &FONT_S, mid, C_CREAM);
+    if (pg_pos && bx > 54 + vw + mw) {
+        cv_rect(bx, 3, pw + 8, 15, C_SCOPE_BG);
+        cv_rect(bx, 3, pw + 8, 1, C_RULE);
+        cv_rect(bx, 17, pw + 8, 1, C_RULE);
+        cv_text(bx + 4, 3, &FONT_S, pg_pos, C_AMBER);
+    }
+    cv_text(rx, 3, &FONT_S, right, rc);
     cv_rect(0, 23, 240, 1, C_RULE);
     cv_blit(0, 0);
 }
@@ -586,7 +641,7 @@ static void splash_frame(uint32_t fade, uint32_t sub)
     const char *t2 = "FOR M-VAVE FM-1";
     const char *t_by = "BY ANDREW GG";
 #ifndef APP_VER
-#define APP_VER "1.11"
+#define APP_VER "2.0"
 #endif
     const char *t_ver = "VERSION " APP_VER "  *  OPEN SOURCE";
 

@@ -35,7 +35,7 @@ def run_wsl(cmd, cwd=None):
 def main():
     # 1. Read version
     version_file = S1VAVE / "VERSION"
-    version = version_file.read_text().strip() if version_file.exists() else "1.11"
+    version = version_file.read_text().strip() if version_file.exists() else "2.0"
     print(f"=== S1VAVE / S2VAVE BUILD PIPELINE (Version {version}) ===")
 
     # 2. Build hardware firmware (FM-1 & SMK-37)
@@ -126,18 +126,21 @@ def main():
     # VST folder in APPDATA and ProgramData
     for target_dir in [APPDATA_VIBE, PROGRAMDATA_VIBE]:
         if target_dir.exists():
-            for fw in ["s1vave", "s2vave"]:
-                for ext in [".wasm", ".json", ".zip", ".png"]:
-                    p = VIBE_SDK / "build" / f"{fw}{ext}"
-                    if p.exists():
-                        shutil.copy2(p, target_dir / f"{fw}{ext}")
-                ed_src = VIBE_SDK / "build" / f"{fw}.editor"
-                ed_dst = target_dir / f"{fw}.editor"
-                if ed_src.exists():
-                    if ed_dst.exists():
-                        shutil.rmtree(ed_dst)
-                    shutil.copytree(ed_src, ed_dst)
-            print(f"  [OK] Deployed s1vave & s2vave -> {target_dir}")
+            try:
+                for fw in ["s1vave", "s2vave"]:
+                    for ext in [".wasm", ".json", ".zip", ".png"]:
+                        p = VIBE_SDK / "build" / f"{fw}{ext}"
+                        if p.exists():
+                            shutil.copy2(p, target_dir / f"{fw}{ext}")
+                    ed_src = VIBE_SDK / "build" / f"{fw}.editor"
+                    ed_dst = target_dir / f"{fw}.editor"
+                    if ed_src.exists():
+                        if ed_dst.exists():
+                            shutil.rmtree(ed_dst)
+                        shutil.copytree(ed_src, ed_dst)
+                print(f"  [OK] Deployed s1vave & s2vave -> {target_dir}")
+            except PermissionError as exc:
+                print(f"  [SKIP] Cannot write to {target_dir} ({exc}) - run elevated or use setup installer")
 
     # Web zip bundles
     sim_dir = S1VAVE / "docs" / "sim"

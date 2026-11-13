@@ -32,7 +32,6 @@ Every aspect—from the classic oscillator core and sub-oscillator waveshapes, t
 - **Unique Wave-Shaping Features**:
   - **OSC DRAW**: 16-step wavetable drawing (`STEP` mode for raw digital textures or `SLOPE` for smooth interpolated waves), with a `1.0x` to `32.0x` frequency multiplier.
   - **OSC CHOP**: Harmonic comb slicing (`1.0` to `32.0` repetitions) with overtone depth control (0–200, $>100$ phase inverted) to create metallic overtones and bell-like timbres.
-  - **Riser / Downer**: Built-in performance transition sweep generator (`SYNC`, `QUIV`, and `QV.PAN` modes) for sweeping rises, risers, and dropouts.
 
 ---
 
@@ -41,7 +40,6 @@ Every aspect—from the classic oscillator core and sub-oscillator waveshapes, t
   - Full $20\text{ Hz} \dots 20\text{ kHz}$ calibrated cutoff curve matching the S-1 hardware pot response.
   - Smooth analog resonance with self-oscillation and bass retention.
   - Keyboard tracking ($0\% \dots 100\%$) and bipolar filter envelope modulation.
-  - Dual filter character modes: **S-1 Clean Roland ACB** and **Warm Midnight** soft-knee drive.
 - **Calibrated ADSR Envelopes**:
   - Precise exponential analog RC attack, decay, sustain, and release curves measured from the Roland S-1 hardware.
   - Envelope trigger modes: `GATE`, `GATE+TRIG` (re-triggers on overlapping notes), and `LFO` (cyclic re-triggering).
@@ -86,6 +84,21 @@ Every aspect—from the classic oscillator core and sub-oscillator waveshapes, t
 
 ---
 
+### 5. VIBE FM DAW Plugin & v2.0 Visual / Workflow Upgrades
+- **VST3 / CLAP / AU Custom Editor (VIBE FM)**:
+  - **Patch & Bank Import/Export (`.fxp` / `.fxb`)**: Save and load single patches or full 99-patch banks directly to `Music/VIBE FM/s1vave/` with an integrated save dialog.
+  - **Sequence Backup (`.s1seq`) & Hardware Sync**: Pull (`GRAB SEQ`) and push (`SEND SEQ`) dual-track patterns (Tracks A & B) between the physical M-VAVE FM-1 and the VST plugin, or save/load `.s1seq` pattern files.
+  - **Standard MIDI File (`.mid`) Export**: Export internal sequencer patterns (Tracks A & B) as standard `.mid` files to drop straight into your DAW piano roll.
+  - **Interactive 64-Step Sequencer Editor**: Edit Tracks A & B, bars 1–4, per-step Note/Chord, Velocity, Gate/Tie, Ratchet, and Chance, with fast `CLEAR TRK` / `CLEAR PTN` actions and optional `KEY REC` step entry from the virtual keyboard.
+  - **Color-Coded Multi-Panel UI**: Category-colored knobs and panels (Oscillator Teal, Filter Orange, Envelope Mint, LFO Blue, FX Purple, Arpeggiator Gold).
+- **Hardware OLED Visuals & Performance (v2.0)**:
+  - **`Page X/Y` Navigation Counters**: Compact page indicators (`1/6`, `2/4`, etc.) in the top header of all multi-page menus (`EDIT`, `ENV`, `LFO`, `FX`, `ARP`, `SEQ`, `GLO`) and non-overlapping `CPU` meter.
+  - **Category-Colored Hardware Outlines**: Distinct visual outline colors for synthesis vs. modulation pages.
+  - **Dedicated `OSC PWM` Page & Streamlined Menus**: Dedicated `EDIT 2/6` PWM page and removal of unused legacy menus (`Riser`, `Phaser`, `Filter Character`).
+  - **Zero-Lag `OSC DRAW` / `OSC CHOP` & Reverb Eco Mode**: Decoupled wavetable rebuilding from encoder turns and added toggleable low-CPU Reverb Eco mode (`HQ` / `ECO`).
+
+---
+
 ## Hardware Panel Controls (M-VAVE FM-1)
 
 The M-VAVE FM-1 has 4 push-encoders (`K1`–`K4`), 8 function buttons, and 16 step keys. Tapping any button brings up its page:
@@ -103,7 +116,6 @@ The M-VAVE FM-1 has 4 push-encoders (`K1`–`K4`), 8 function buttons, and 16 st
 | **ENV (TRIG/AMP)** | Env Trigger Mode `[CC 29]` | Amp Mode (Gate/Env) `[CC 28]` | PWM Source `[CC 16]` | PWM Depth `[CC 15]` |
 | **LFO (CORE)** | LFO Rate `[CC 3]` | Waveform `[CC 12]` | Tempo Sync `[CC 106]` | Fast Mode `[CC 79]` |
 | **LFO (ROUTING)** | Pitch LFO Depth `[CC 13]` | Filter LFO Depth `[CC 25]` | PWM Depth `[CC 15]` | Key Trigger `[CC 105]` |
-| **LFO (RISER)** | Riser Mode (Sync/Quiv/Pan) | Riser Resonance | Riser Shape | Riser Level |
 | **FX (MIX)** | Chorus Mode `[CC 93]` | Delay Level `[CC 92]` | Reverb Level `[CC 91]` | Delay Time `[CC 90]` |
 | **FX (DELAY)** | Delay Level `[CC 92]` | Delay Time `[CC 90]` | Delay Feedback | Delay Tempo Sync |
 | **FX (REVERB)** | Reverb Level `[CC 91]` | Reverb Time `[CC 89]` | Reverb Type (Plate..Mod) | Chorus Mode `[CC 93]` |
@@ -144,7 +156,7 @@ S1Vave maps parameters 1:1 to the S-1 MIDI specification:
 - `CC 75`: Envelope Decay
 - `CC 76`: Fine Tune
 - `CC 77`: Key Transpose
-- `CC 78`: Noise Mode (0=Pink, 1=White) / Riser Mode
+- `CC 78`: Noise Mode (0=Pink, 1=White)
 - `CC 79`: LFO Speed Mode (0=Normal, 1=Fast)
 - `CC 80`: Poly Mode (0=Mono, 1=Unison, 2=Poly, 3=Chord)
 - `CC 89`: Reverb Time
@@ -169,7 +181,7 @@ S1Vave maps parameters 1:1 to the S-1 MIDI specification:
 Connect your M-VAVE FM-1 via USB-C to your computer:
 
 ```bash
-python tools/fm1_install.py build/s1vave-1.1.fwsc --yes
+python tools/fm1_install.py build/s1vave-2.0.fwsc --yes
 ```
 
 The script communicates over USB HID, validates checksums, flashes the firmware sector by sector (~2 minutes), and automatically reboots the hardware into S1Vave.
@@ -218,10 +230,10 @@ git clone --depth 1 --branch AC79NN_SDK_V1.2.1_2023-12-13 https://gitee.com/Jiel
 
 ### 4. Compile Firmware Package
 ```bash
-./build.sh --release 1.1
+./build.sh --release 2.0
 ```
 
-The build pipeline enforces strict JieLi AC791N hardware rules (integer-only fixed-point DSP, prohibition of 64-bit software divisions, and ROM collision prevention). The resulting `.fwsc` firmware binary will be placed at `build/s1vave-1.1.fwsc`.
+The build pipeline enforces strict JieLi AC791N hardware rules (integer-only fixed-point DSP, prohibition of 64-bit software divisions, and ROM collision prevention). The resulting `.fwsc` firmware binary will be placed at `build/s1vave-2.0.fwsc`.
 
 ---
 
@@ -232,7 +244,16 @@ The build pipeline enforces strict JieLi AC791N hardware rules (integer-only fix
 - **[Hardware Panel & Navigation Guide](docs/PANEL_GUIDE.md)**: Complete guide to all physical knobs, buttons, layers, and sequencer views.
 - **[MIDI CC Implementation Chart](docs/MIDI_CC.md)**: Complete reference of all supported MIDI Control Changes.
 - **[JieLi AC791N Hardware Rules](docs/RULES.md)**: Architectural and compiler rules for developing firmware on the AC791N RISC MCU.
+- **[VIBE Custom UI Template Guide](../vibe-fm-sdk-main/firmwares/s1vave/editor/TEMPLATE_GUIDE.md)**: Reusable 6-panel `.editor` layout & SMF `.mid` export boilerplate for VIBE firmware authors.
 - **[Licensing & Credits](LICENSING.md)**: Upstream credits, contributors, and open-source licenses.
+
+---
+
+## VST Plugin Troubleshooting (Blank White Screen in Ableton Live 12 / Windows)
+
+If the **VIBE FM** VST window opens as a blank white screen in **Ableton Live 12** (or another Windows DAW):
+1. Install or repair the **Microsoft Edge WebView2 Runtime** (Evergreen Bootstrapper) from Microsoft's official WebView2 download page and restart your DAW.
+2. If the UI still renders blank, right-click the VST plugin in Ableton's browser and toggle **Auto-Scale Plugin Window** (HiDPI scaling), or disable hardware/GPU compositing in WebView2 (`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--disable-gpu`).
 
 ---
 

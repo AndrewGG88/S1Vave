@@ -119,9 +119,6 @@ typedef struct {
     int32_t g_chop_masked;
     uint32_t poly_mode, porta_mode, glide_k;
     int32_t fine_tune8, range_semi8, transp_semi8;
-    /* Riser effect state */
-    int32_t riser_sm, riser_reso_k, riser_shape, riser_lvl;
-    uint32_t riser_mode, riser_ph;
 } part_t;
 
 static int32_t lfo_shape(const part_t *g, uint32_t ph, uint32_t shape);
