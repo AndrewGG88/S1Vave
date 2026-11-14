@@ -268,3 +268,5 @@ If the **VIBE FM** VST window opens as a blank white screen in **Ableton Live 12
 - **SMK-37 Port**: [M. Geisler](https://github.com/genkigenki/sloop-fm1/tree/smk37)
 
 *Roland, AIRA, AIRA Compact, S-1, and SH-101 are trademarks of Roland Corporation. M-VAVE, FM-1, and SMK-37 are trademarks of Shenzhen Sincoo Technology Co., Ltd. S1Vave is an independent community project and is not affiliated with or endorsed by Roland Corporation or Shenzhen Sincoo Technology Co., Ltd.*
+
+You can also try S1Vave in the browser, no flashing needed, in the free community [FM-1 Emulator](https://fm1-emulator.atst.tools/).
