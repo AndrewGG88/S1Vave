@@ -1,0 +1,32 @@
+# SH-101 filter A/B: resonance steps on one note, a cutoff sweep while singing, then a chord.
+# build/host/s1vave OUT tests/sh101_ab.txt  (OBV_FILTER_SH101=0 or 1; CC 49 127 picks the SH-101 VCF, ignored by a default build)
+0 midi 0xB0 49 127
+500 midi 0xB0 74 70
+500 midi 0xB0 71 0
+1000 midi 0x90 48 100
+2500 midi 0x80 48 0
+3000 midi 0xB0 71 64
+3000 midi 0x90 48 100
+4500 midi 0x80 48 0
+5000 midi 0xB0 71 100
+5000 midi 0x90 48 100
+6500 midi 0x80 48 0
+7000 midi 0xB0 71 127
+7000 midi 0x90 48 100
+7500 midi 0xB0 74 50
+8000 midi 0xB0 74 60
+8500 midi 0xB0 74 80
+9000 midi 0xB0 74 90
+9500 midi 0xB0 74 100
+10000 midi 0x80 48 0
+10500 midi 0xB0 74 64
+10500 midi 0xB0 71 80
+10500 midi 0x90 48 100
+10500 midi 0x90 55 100
+10500 midi 0x90 60 100
+10500 midi 0x90 64 100
+12500 midi 0x80 48 0
+12500 midi 0x80 55 0
+12500 midi 0x80 60 0
+12500 midi 0x80 64 0
+14000 end

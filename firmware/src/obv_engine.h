@@ -10,6 +10,28 @@
 #define RING_PUBLISH() __asm__ volatile("" ::: "memory")
 #endif
 
+/* Filter: 0 = the S-1 4-pole SVF cascade only (default); 1 = the SH-101 VCF built in as well (sh101_vcf.h, from
+ * github.com/bk40-home/sh101-vcf: the IR3109 VCF and its resonance circuit, single-precision float), chosen at run time
+ * on the screen (SEL page 1, knob 4 VCF: S-1 / SH-101; or CC 49) and kept with the settings. It needs the FPU build
+ * flags in tools/build.py. Build it with OBV_DEFS=-DOBV_FILTER_SH101=1 ./build.sh; docs/SH101_FILTER.md has the details */
+#ifndef OBV_FILTER_SH101
+#define OBV_FILTER_SH101 0
+#endif
+#if OBV_FILTER_SH101
+#ifndef SH101_RES_TAPER
+#define SH101_RES_TAPER 2.0f        /* RESO's curve: it self-oscillates from ~108 of 127 (1.0: the 101's slider, from 92) */
+#endif
+#ifndef SH101_SING_TRIM
+#define SH101_SING_TRIM 0.7f        /* -3 dB at full RESO once it sings: chords stay off clipping (1.0: the circuit, mono) */
+#endif
+#include "sh101_vcf.h"
+static volatile uint32_t ctl_vcf;               /* the UI's choice: 0 = the S-1 SVF, 1 = the SH-101 VCF */
+static uint32_t vcf_101;                        /* the audio's copy, taken once per buffer (vcf_take) */
+#define VCF_101 vcf_101
+#else
+#define VCF_101 0u                              /* (the S-1 SVF only: every test on it folds away) */
+#endif
+
 #define NV 8u                                   /* 8-voice polyphony matching extended architecture */
 #define NHELD 16u
 #define ENV_ONE (1 << 24)
@@ -27,6 +49,10 @@ typedef struct {
     env_t fe, ae;                               /* Filter and amp envelopes */
     svf_state_t f1, f2;                         /* 4-pole cascaded SVF stages */
     svf_coef_t c1, c2;
+#if OBV_FILTER_SH101
+    sh101_coef_t shc;                           /* SH-101 VCF: coefficients per block, state */
+    sh101_state_t shs;
+#endif
     uint32_t inc, pw;                           /* Phase step & pulse width */
     int32_t amp0, amp1;                         /* Q15 amplitude slew */
     int32_t pitch16, target16;                  /* Q16 semitones: glide */
@@ -114,6 +140,9 @@ typedef struct {
     int32_t fenv_amt, keytrk, lfo_pd, lfo_fd, wheel_q, bend8, flt_bend8;
     int32_t lvl_sqr, lvl_saw, lvl_sub, lvl_noi, reso_k1, reso_k2, vint, sus_f, sus_a, gain_q12;
     int32_t cut_sm, reso_sm;
+#if OBV_FILTER_SH101
+    int32_t res101_sm;                          /* RESO as the SH-101 slider (Q8, 0..127 = 0..10), smoothed */
+#endif
     uint32_t pw_base, pwm_src, sub_type, noise_mode, draw_sw, draw_mult_q8;
     uint32_t chop_ovtn, chop_comb_q8;
     int32_t g_chop_masked;
@@ -130,7 +159,13 @@ static void parts_point(void)
     b_own = seq_b_own();
     pt[1].p = b_own ? &live_b : &live;
     if (b_own && !was) {
+#if OBV_FILTER_SH101
+        pt[1].cut_sm = vcf_101 ? sh101_panel_cut(live_b.v[P_CUTOFF] & 127u)
+                               : (int32_t)CUTOFF_TAPER_WARM[live_b.v[P_CUTOFF] & 127u];
+        pt[1].res101_sm = sh101_panel_res(live_b.v[P_RESO] & 127u);
+#else
         pt[1].cut_sm = (int32_t)CUTOFF_TAPER_WARM[live_b.v[P_CUTOFF] & 127u];
+#endif
         pt[1].reso_sm = live_b.v[P_RESO] << 8;
     }
 }
@@ -185,7 +220,7 @@ static void voice_start(voice_t *v, uint32_t part, uint32_t note, uint32_t vel, 
     v->o_sqr.ph += jitter;
     v->o_saw.ph = v->o_sqr.ph;
     v->o_sub.ph = (pv[P_SUB_TYPE] % 3u == SUB_1OC) ? (v->o_sqr.ph >> 1) : (v->o_sqr.ph >> 2);
-    if (pv[P_RESO] > 110) {
+    if (pv[P_RESO] > 110 && !VCF_101) {         /* (the SH-101 model starts from its own circuit noise) */
         v->f2.ic1 += (int32_t)pv[P_RESO] * 64;
     }
     voice_pan(v, pan);
@@ -717,13 +752,21 @@ static void block_globals(part_t *g)
     g->bend8 = (ctl_bend * pv[P_OSC_BEND] * 256) >> 13;
     g->flt_bend8 = (ctl_bend * pv[P_FLT_BEND] * 256) >> 13;
 
+#if OBV_FILTER_SH101
+    int32_t target_cut = vcf_101 ? sh101_panel_cut(pv[P_CUTOFF] & 127u)  /* the SH-101 FREQ slider, with its limits */
+                                 : (int32_t)CUTOFF_TAPER_WARM[pv[P_CUTOFF] & 127u];
+#else
     int32_t target_cut = (int32_t)CUTOFF_TAPER_WARM[pv[P_CUTOFF] & 127u];
+#endif
     g->cut_sm += (target_cut - g->cut_sm) >> 6;
     /* Resonance: 2x calibration matching S-1 hardware resonance strength */
     int32_t reso_scaled = (int32_t)pv[P_RESO] * 2;
     if (reso_scaled > 127) reso_scaled = 127;
     g->reso_sm += ((reso_scaled << 8) - g->reso_sm) >> 6;
     g->reso_k1 = 8192 - g->reso_sm * 8400 / (127 * 256);
+#if OBV_FILTER_SH101
+    g->res101_sm += (sh101_panel_res(pv[P_RESO] & 127u) - g->res101_sm) >> 6;
+#endif
     g->reso_k2 = 8192;
 
     int32_t sus_raw = pv[P_SUSTAIN];
@@ -826,8 +869,15 @@ static void voice_block(voice_t *v, uint32_t card)
         + ((int32_t)v->note - 60) * (int32_t)g->keytrk + ((lfo * g->lfo_fd) >> 15)
         + g->flt_bend8;
     cut = clampi(cut, 0, 136 << 8);
-    svf_coef(&v->c1, cut, g->reso_k1);
-    svf_coef(&v->c2, cut, 8192);
+#if OBV_FILTER_SH101
+    if (vcf_101)
+        sh101_coef(&v->shc, cut, g->res101_sm); /* cut: where it sings, as the SVF's */
+    else
+#endif
+    {
+        svf_coef(&v->c1, cut, g->reso_k1);
+        svf_coef(&v->c2, cut, 8192);
+    }
 
     /* Amplitude calculation */
     v->amp0 = v->amp1;
@@ -946,8 +996,17 @@ static void voice_render(voice_t *v, int32_t *out)
         mix = clampi(mix, -65535, 65535);
 
         /* 7. Roland 4-Pole Cascaded SVF with authentic OTA resonance saturation */
-        svf_step(&v->c1, &v->f1, mix, &lp, &bp, &hp);
-        y = svf_lp(&v->c2, &v->f2, lp);
+#if OBV_FILTER_SH101
+        if (vcf_101) {
+            y = sh101_step(&v->shc, &v->shs, mix);   /* singing peaks ~1.5 osc: the amp product below is 64-bit */
+            if (y > 120000) y = 120000;         /* bound: 8 voices x pan gain stay within the int32 bus */
+            if (y < -120000) y = -120000;
+        } else
+#endif
+        {
+            svf_step(&v->c1, &v->f1, mix, &lp, &bp, &hp);
+            y = svf_lp(&v->c2, &v->f2, lp);
+        }
 
         /* 8. Amplifier Envelope and Panning */
         amp = amp0 + ((da * (int32_t)i) >> 4);
@@ -957,11 +1016,30 @@ static void voice_render(voice_t *v, int32_t *out)
             if (f > 32768) f = 32768;
             amp = (int32_t)(((int64_t)amp * f) >> 15);
         }
+#if OBV_FILTER_SH101
+        if (vcf_101) y = (int32_t)(((int64_t)y * amp) >> 16);
+        else
+#endif
         y = (y * amp) >> 16;
         out[2u * i]      += (y * gl) >> 12;
         out[2u * i + 1u] += (y * gr) >> 12;
     }
 }
+
+#if OBV_FILTER_SH101
+/* The VCF switch, at the top of a buffer: both filters start from rest (a voice sounding at the switch restarts its
+ * filter: a click at most). CUTOFF's smoothing then moves it to the new filter's taper within a few ms */
+static void vcf_take(void)
+{
+    uint32_t v;
+    vcf_101 = ctl_vcf & 1u;
+    for (v = 0; v < NV; v++) {
+        memset(&vc[v].f1, 0, sizeof vc[v].f1);
+        memset(&vc[v].f2, 0, sizeof vc[v].f2);
+        sh101_reset(&vc[v].shs, 0x2545F491u * (v + 1u));
+    }
+}
+#endif
 
 static int32_t bus_b[2u * HALF_FRAMES];
 
@@ -973,6 +1051,9 @@ static void engine_audio(int32_t *out, uint32_t n)
 
     fx_block(&live, ctl_ext_quarter ? ctl_ext_quarter : 60u * FS / clampi(ctl_tempo, 40, 240));
     vol_q12 = (int32_t)((ctl_cc7 * ctl_cc7) >> 2);
+#if OBV_FILTER_SH101
+    if ((ctl_vcf & 1u) != vcf_101) vcf_take();
+#endif
 
     for (v = 0; v < NV; v++)
         if (vc[v].part && vc[v].ae.stage != E_IDLE) bus = 1;
@@ -1104,6 +1185,10 @@ static int engine_quiet(void)
 
 static void engine_init(void)
 {
+#if OBV_FILTER_SH101
+    sh101_init();
+    for (uint32_t v = 0; v < NV; v++) sh101_reset(&vc[v].shs, 0x2545F491u * (v + 1u));
+#endif
     for (uint32_t v = 0; v < NV; v++) {
         vc[v].noise = 0x12345678u * (v + 1u) + 0x9E3779B9u;
         uint32_t ph = xorshift(&vc[v].noise) + v * 0x40000000u;
