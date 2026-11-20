@@ -496,7 +496,12 @@ static void param_value(char *s, uint32_t p, uint32_t v)   /* <= 7 characters */
         break;
     case K_PCT: fmt_u(s, (v * 100u + 63u) / 127u); scat(s, "%"); break;
     case K_CUT: {
+#if OBV_FILTER_SH101
+        uint32_t semi = ctl_vcf ? (uint32_t)sh101_panel_cut((int32_t)(v & 127u)) >> 8   /* the SH-101 FREQ slider */
+                                : (uint32_t)CUTOFF_TAPER[v & 127u] >> 8;
+#else
         uint32_t semi = (uint32_t)CUTOFF_TAPER[v & 127u] >> 8;
+#endif
         if (semi > 136u) semi = 136u;
         uint32_t hz = CUT_HZ[semi];
         if (hz < 10000u) { fmt_u(s, hz); scat(s, "Hz"); }
@@ -711,6 +716,14 @@ static void draw_page(void)
             else if (i == 1) { scat(k[i].value, CLICK_NAME[clk]); k[i].v = (int32_t)clk; k[i].max = NCLICK - 1; }
             else if (i == 2) { if (set.midi_ch) fmt_u(k[i].value, set.midi_ch); else scat(k[i].value, "OMNI"); k[i].v = set.midi_ch; k[i].max = 16; }
             else { scat(k[i].value, set.tune < 0 ? "-" : "+"); fmt_u(k[i].value + 1, (uint32_t)(set.tune < 0 ? -set.tune : set.tune)); scat(k[i].value, "c"); k[i].v = set.tune + 50; k[i].max = 100; k[i].bip = 1; }
+#if OBV_FILTER_SH101
+        } else if (page == PG_ADV1 && !layer && i == 3) {
+            k[i].label = "VCF";                 /* the filter: the S-1's SVF or the SH-101's VCF (settings, CC 49) */
+            k[i].v = ctl_vcf & 1u;
+            k[i].max = 1;
+            k[i].present = 1;
+            scat(k[i].value, ctl_vcf ? "SH-101" : "S-1");
+#endif
         } else if (page == PG_ADV2 && !layer && i == 3) {
             k[i].label = "REV ECO";
             k[i].v = ctl_rev_eco & 1u;
@@ -1686,6 +1699,18 @@ static void midi_in(uint32_t notes_only)
                 say(eco ? "REV ECO ON" : "REV HQ");
                 dirty_page = 1;
             }
+#if OBV_FILTER_SH101
+            else if (d1 == 49u) {               /* VCF: 0..63 the S-1 SVF, 64..127 the SH-101 VCF */
+                uint32_t f = d2 >= 64u ? 1u : 0u;
+                if (f != (ctl_vcf & 1u)) {
+                    ctl_vcf = f;
+                    if (f) set.click |= 0x40u; else set.click &= (uint8_t)~0x40u;
+                    set_dirty = 1; set_t = fm1_ms;
+                    say(f ? "VCF SH-101" : "VCF S-1");
+                    dirty_page = 1;
+                }
+            }
+#endif
             else if (d1 == 64u) ctl_sustain = d2 >= 64u;
             else if (d1 == 111u) {
                 ctl_arp_on = d2 >= 64u ? 1u : 0u;
@@ -1973,6 +1998,9 @@ static void app_main(void)
     ctl_tempo = set.tempo;
     ctl_tune8 = set.tune * 256 / 100;
     ctl_rev_eco = (set.click & 0x80u) != 0u;
+#if OBV_FILTER_SH101
+    ctl_vcf = (set.click & 0x40u) != 0u;        /* bit 6: the VCF (a default build leaves it as it found it) */
+#endif
     load_pattern(set.pat);
     load_program(set.prog);
     b_load();
@@ -2336,7 +2364,7 @@ static void app_main(void)
             if (e > 1 || e < -1) e *= 3;        /* a fast turn goes further */
             if (page == PG_GLOBAL && !layer && !SMK_PAD_HELD) {   /* (a held layer has the knobs, on every page) */
                 if (k == 0) { set.tempo = (uint8_t)clampi(set.tempo + e, 40, 240); ctl_tempo = set.tempo; pat.tempo = set.tempo; }
-                else if (k == 1) set.click = (uint8_t)((set.click & 0x80u) | (uint32_t)clampi((int32_t)((set.click & 0x07u) % NCLICK) + (e > 0 ? 1 : -1), 0, NCLICK - 1));
+                else if (k == 1) set.click = (uint8_t)((set.click & 0xC0u) | (uint32_t)clampi((int32_t)((set.click & 0x07u) % NCLICK) + (e > 0 ? 1 : -1), 0, NCLICK - 1));
                 else if (k == 2) set.midi_ch = (uint8_t)clampi(set.midi_ch + e, 0, 16);
                 else { set.tune = (int8_t)clampi(set.tune + e, -50, 50); ctl_tune8 = set.tune * 256 / 100; }
                 set_dirty = 1; set_t = fm1_ms;
@@ -2373,6 +2401,17 @@ static void app_main(void)
                     pat_edited = 1;
                 }
                 dirty_scope = 1;
+#if OBV_FILTER_SH101
+            } else if (page == PG_ADV1 && !layer && k == 3) {
+                uint32_t f = e > 0 ? 1u : 0u;
+                if (f != (ctl_vcf & 1u)) {
+                    ctl_vcf = f;
+                    if (f) set.click |= 0x40u; else set.click &= (uint8_t)~0x40u;
+                    set_dirty = 1; set_t = fm1_ms;
+                    say(f ? "VCF SH-101" : "VCF S-1");
+                    dirty_page = 1;             /* (CUTOFF's Hz on other pages follow the taper) */
+                }
+#endif
             } else if (page == PG_ADV2 && !layer && k == 3) {
                 uint32_t eco = e > 0 ? 1u : 0u;
                 if (eco != (ctl_rev_eco & 1u)) {

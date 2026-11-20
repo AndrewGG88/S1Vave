@@ -1,0 +1,12 @@
+# SH-101 build: the VCF switched under a held chord (S-1 -> SH-101 -> S-1 -> SH-101), RESO 100.
+# build/host/s1vave OUT tests/sh101_switch.txt  (OBV_FILTER_SH101=1)
+2500 midi 0xB0 74 70
+2500 midi 0xB0 71 100
+3000 midi 0x90 48 100
+3000 midi 0x90 55 100
+4000 midi 0xB0 49 127
+5000 midi 0xB0 49 0
+6000 midi 0xB0 49 127
+7000 midi 0x80 48 0
+7000 midi 0x80 55 0
+8000 end

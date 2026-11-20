@@ -45,6 +45,12 @@ LOADER_LOAD = 0x01C0A800
 LOADER_NAME = b"usb_hid_ota.bin"    # the file name the SPL looks for
 DOCKER_IMAGE = os.environ.get("JIELI_DOCKER_IMAGE", "debian:bookworm-slim")
 CFLAGS = ["-Os", "-ffunction-sections", "-fno-builtin", "-Wall", "-Wno-unused-function"]
+# The AC79's single-precision FPU (the SDK's own flags, as fm-106 and Melodee build), for float code: the SH-101 filter
+# (OBV_DEFS=-DOBV_FILTER_SH101=1). Only added when that is asked for, so the default firmware is built exactly as
+# before. Without them clang emits softfloat calls this freestanding link cannot resolve. The FPU has no fused
+# multiply-add, so contraction stays off (host and device then round the same); no double hardware, so an accidental
+# double is an error rather than a link failure.
+FPU_FLAGS = ["-mcpu=r3", "-mfprev1", "-ffp-contract=off", "-Werror=double-promotion"]
 APP_CFLAGS = [os.environ.get("OBV_OPT", "-Os"), *CFLAGS[1:]]   # -Os as Dinghy: with -O2 (unity build, usb.c inside) the
                                     # FM-1's USB-MIDI IN babbled on the device (2026-10-13); OBV_OPT=-O2 to try again
 LINE = re.compile(r"^\s*([0-9a-f]+):\s+((?:[0-9a-f]{2} )+)\s*\t(.*)$")
@@ -173,6 +179,8 @@ def build_app():
             raise SystemExit("OBV_DATA_FAMILY: 1..7 of A-Z 0-9")
         flags.append(f'-DOBV_DATA_FAMILY="{fam}"')
     flags += os.environ.get("OBV_DEFS", "").split()   # (a test build: OBV_DEFS=-DFELUCCA_UAC=0 ./build.sh)
+    if any(d.replace(" ", "") in ("-DOBV_FILTER_SH101=1",) for d in flags):
+        flags += FPU_FLAGS                  # float code in this build (the SH-101 filter): the FPU
     cmds = [("cc", "-c", FW / "crt0.S", "-o", OUT / "crt0.o"),
             ("cc", "-c", FW / "hal" / "fm1_vec.S", "-o", OUT / "fm1_vec.o"),
             ("cc", "-c", FW / "hal" / "fm1_isr.S", "-o", OUT / "fm1_isr.o"),

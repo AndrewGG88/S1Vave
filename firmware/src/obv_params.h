@@ -360,7 +360,11 @@ static const page_t PAGE[NPAGE] = {
     [PG_ARP]        = {"ARPEGGIO",  {-1, -1, -1, -1}},
     [PG_ARP_CFG]    = {"ARP CONFIG",{-1, -1, -1, -1}},
     [PG_SEQ]        = {"SEQUENCER", {-1, -1, -1, -1}},
+#if defined(OBV_FILTER_SH101) && OBV_FILTER_SH101
+    [PG_ADV1]       = {"STEREO/VCF",{P_SPREAD, P_DETUNE, -1, -1}},   /* knob 4: VCF (s1vave.c) */
+#else
     [PG_ADV1]       = {"STEREO",    {P_SPREAD, P_DETUNE, -1, -1}},
+#endif
     [PG_ADV2]       = {"LOFI/ECO",  {P_FX_MODE, P_FX_AMT, P_FX_MIX, -1}},
 };
 
